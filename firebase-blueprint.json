@@ -1,0 +1,103 @@
+{
+  "entities": {
+    "Defect": {
+      "title": "Defect",
+      "description": "Represents a physical defect found on a textile roll.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "meterLocation": { "type": "number" },
+        "type": { "type": "string" },
+        "severity": { "type": "number", "enum": [1, 2, 3, 4] },
+        "comment": { "type": "string" },
+        "photoUrl": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "meterLocation", "type", "severity", "timestamp"]
+    },
+    "Roll": {
+      "title": "Roll",
+      "description": "A specific roll of fabric being inspected.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "rollNumber": { "type": "string" },
+        "lengthYards": { "type": "number" },
+        "widthInches": { "type": "number" },
+        "weightKg": { "type": "number" },
+        "shade": { "type": "string" },
+        "defects": { "type": "array", "items": { "$ref": "#/entities/Defect" } },
+        "status": { "type": "string", "enum": ["PENDING", "COMPLETED"] },
+        "comments": { "type": "string" },
+        "startTime": { "type": "string", "format": "date-time" },
+        "endTime": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "rollNumber", "lengthYards", "widthInches", "status"]
+    },
+    "ActivityLog": {
+      "title": "ActivityLog",
+      "description": "A log of an action taken during an inspection.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userId": { "type": "string" },
+        "action": { "type": "string" },
+        "details": { "type": "string" }
+      },
+      "required": ["id", "timestamp", "userId", "action", "details"]
+    },
+    "Inspection": {
+      "title": "Inspection",
+      "description": "A complete textile inspection record.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "version": { "type": "number" },
+        "customerName": { "type": "string" },
+        "orderNumber": { "type": "string" },
+        "styleRef": { "type": "string" },
+        "fabricType": { "type": "string" },
+        "color": { "type": "string" },
+        "gsm": { "type": "number" },
+        "composition": { "type": "string" },
+        "season": { "type": "string" },
+        "dyeLot": { "type": "string" },
+        "inspectorId": { "type": "string" },
+        "inspectorName": { "type": "string" },
+        "inspectionDate": { "type": "string", "format": "date-time" },
+        "rolls": { "type": "array", "items": { "$ref": "#/entities/Roll" } },
+        "status": { "type": "string", "enum": ["DRAFT", "COMPLETED", "SYNCED"] },
+        "syncStatus": { "type": "string" },
+        "totalPoints": { "type": "number" },
+        "pointsPer100Yds": { "type": "number" },
+        "isPass": { "type": "boolean" },
+        "logs": { "type": "array", "items": { "$ref": "#/entities/ActivityLog" } }
+      },
+      "required": ["id", "customerName", "orderNumber", "inspectorId", "inspectorName", "inspectionDate", "rolls", "status"]
+    },
+    "User": {
+      "title": "User",
+      "description": "An employee or inspector in the system.",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["INSPECTOR", "MANAGER", "ADMIN"] },
+        "factoryId": { "type": "string" },
+        "email": { "type": "string", "format": "email" }
+      },
+      "required": ["id", "name", "role", "factoryId"]
+    }
+  },
+  "firestore": {
+    "/inspections/{inspectionId}": {
+      "schema": "Inspection",
+      "description": "Collection of textile inspection reports."
+    },
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "Profiles for inspectors and staff."
+    }
+  }
+}

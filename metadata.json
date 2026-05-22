@@ -1,0 +1,11 @@
+{
+  "name": "TexInspect - Industrial Fabric Inspection",
+  "description": "A high-performance, offline-first fabric inspection tool for textile manufacturers using the ASTM D5430 4-Point System.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
