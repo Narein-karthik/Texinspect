@@ -188,5 +188,33 @@ export const inspectionService = {
         );
       }
     );
+  },
+
+  subscribeToAllInspections(
+    callback: (inspections: Inspection[]) => void
+  ) {
+
+    return onSnapshot(
+
+      collection(db, INSPECTIONS_COLLECTION),
+
+      (snapshot) => {
+
+        const inspections = snapshot.docs.map(
+          doc => doc.data() as Inspection
+        );
+
+        callback(inspections);
+      },
+
+      (error) => {
+
+        handleFirestoreError(
+          error,
+          OperationType.LIST,
+          INSPECTIONS_COLLECTION
+        );
+      }
+    );
   }
 };

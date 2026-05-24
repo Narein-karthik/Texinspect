@@ -1,9 +1,42 @@
 import React, { useEffect } from 'react';
 import { onAuthStateChanged } from 'firebase/auth';
-import { auth } from './lib/firebase';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { auth, db } from './lib/firebase';
 import { useStore } from './store';
-import { User } from './types';
+import { User, UserRole } from './types';
 import { inspectionService } from './services/inspectionService';
+
+const LOGIN_ROLE_KEY = 'tex-inspect-login-role';
+
+async function resolveUser(firebaseUser: NonNullable<typeof auth.currentUser>): Promise<User> {
+  const requestedRole = (localStorage.getItem(LOGIN_ROLE_KEY) as UserRole | null) || 'INSPECTOR';
+  const userRef = doc(db, 'users', firebaseUser.uid);
+  const snapshot = await getDoc(userRef);
+  const existingUser = snapshot.exists() ? (snapshot.data() as User) : null;
+  const role: UserRole = existingUser?.role === 'ADMIN' && requestedRole === 'ADMIN'
+    ? 'ADMIN'
+    : 'INSPECTOR';
+
+  const user: User = {
+    id: firebaseUser.uid,
+    name: existingUser?.name || firebaseUser.displayName || 'Inspector',
+    role,
+    factoryId: existingUser?.factoryId || 'factory-1'
+  };
+
+  if (!existingUser) {
+    await setDoc(userRef, {
+      ...user,
+      role: 'INSPECTOR',
+      email: firebaseUser.email || '',
+      photoURL: firebaseUser.photoURL || '',
+      createdAt: new Date().toISOString(),
+    });
+  }
+
+  localStorage.setItem(LOGIN_ROLE_KEY, role);
+  return user;
+}
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const setCurrentUser = useStore((state) => state.setCurrentUser);
@@ -13,13 +46,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (firebaseUser) => {
       if (firebaseUser) {
-        const user: User = {
-          id: firebaseUser.uid,
-          name: firebaseUser.displayName || 'Inspector',
-          role: 'INSPECTOR',
-          factoryId: 'factory-1'
-        };
-        setCurrentUser(user);
+        resolveUser(firebaseUser)
+          .then(setCurrentUser)
+          .catch((error) => {
+            console.error('Unable to resolve user profile', error);
+            setCurrentUser({
+              id: firebaseUser.uid,
+              name: firebaseUser.displayName || 'Inspector',
+              role: 'INSPECTOR',
+              factoryId: 'factory-1'
+            });
+          });
       } else {
         setCurrentUser(null);
         setInspections([]);
@@ -32,12 +69,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     if (!currentUser?.id) return;
 
-    const unsubscribeInspections = inspectionService.subscribeToInspections(currentUser.id, (data) => {
-      setInspections(data);
-    });
+    const unsubscribeInspections = currentUser.role === 'ADMIN'
+      ? inspectionService.subscribeToAllInspections((data) => {
+          setInspections(data);
+        })
+      : inspectionService.subscribeToInspections(currentUser.id, (data) => {
+          setInspections(data);
+        });
 
     return () => unsubscribeInspections();
-  }, [currentUser?.id, setInspections]);
+  }, [currentUser?.id, currentUser?.role, setInspections]);
 
   return <>{children}</>;
 }

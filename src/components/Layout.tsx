@@ -1,6 +1,6 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, PlusSquare, FileText, LogIn } from 'lucide-react';
+import { Home, PlusSquare, FileText, ShieldCheck, UserCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store';
@@ -8,17 +8,18 @@ import { signInWithGoogle } from '../lib/firebase';
 import { StatusBar } from './StatusBar';
 
 const LoginScreen = () => {
-  const [loading, setLoading] = React.useState(false);
+  const [loadingRole, setLoadingRole] = React.useState<'INSPECTOR' | 'ADMIN' | null>(null);
 
-  const handleLogin = async () => {
-    setLoading(true);
+  const handleLogin = async (role: 'INSPECTOR' | 'ADMIN') => {
+    setLoadingRole(role);
+    localStorage.setItem('tex-inspect-login-role', role);
 
     try {
       await signInWithGoogle();
     } catch (error) {
       console.error(error);
     } finally {
-      setLoading(false);
+      setLoadingRole(null);
     }
   };
 
@@ -54,15 +55,31 @@ const LoginScreen = () => {
             Please authenticate using your company account to access the inspection terminal.
           </p>
 
-          <button
-            onClick={handleLogin}
-            disabled={loading}
-            className="w-full bg-white text-gray-900 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl disabled:opacity-50"
-          >
-            <LogIn size={20} />
+          <div className="grid gap-3">
+            <button
+              onClick={() => handleLogin('INSPECTOR')}
+              disabled={Boolean(loadingRole)}
+              className="w-full bg-white text-gray-900 py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl disabled:opacity-50"
+            >
+              <UserCheck size={20} />
 
-            {loading ? 'Authenticating...' : 'Sign In With Google'}
-          </button>
+              {loadingRole === 'INSPECTOR' ? 'Authenticating...' : 'Sign In As Inspector'}
+            </button>
+
+            <button
+              onClick={() => handleLogin('ADMIN')}
+              disabled={Boolean(loadingRole)}
+              className="w-full bg-blue-600 text-white py-4 rounded-2xl font-black text-sm uppercase tracking-widest flex items-center justify-center gap-3 active:scale-95 transition-all shadow-xl shadow-blue-950/30 disabled:opacity-50"
+            >
+              <ShieldCheck size={20} />
+
+              {loadingRole === 'ADMIN' ? 'Authenticating...' : 'Sign In As Admin'}
+            </button>
+          </div>
+
+          <p className="text-[10px] text-white/35 font-bold leading-relaxed">
+            Admin access is enabled only for accounts marked as ADMIN in Firebase.
+          </p>
         </div>
 
         <div className="text-[10px] text-white/20 font-black uppercase tracking-widest">
@@ -99,11 +116,16 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     return <LoginScreen />;
   }
 
-  const navItems = [
-    { icon: Home, label: 'Dashboard', path: '/' },
-    { icon: PlusSquare, label: 'New', path: '/new' },
-    { icon: FileText, label: 'Reports', path: '/reports' },
-  ];
+  const navItems = currentUser.role === 'ADMIN'
+    ? [
+        { icon: Home, label: 'Admin', path: '/' },
+        { icon: FileText, label: 'Reports', path: '/reports' },
+      ]
+    : [
+        { icon: Home, label: 'Dashboard', path: '/' },
+        { icon: PlusSquare, label: 'New', path: '/new' },
+        { icon: FileText, label: 'Reports', path: '/reports' },
+      ];
 
   return (
     <div className="min-h-screen bg-[#F8F9FA] text-gray-900 font-sans selection:bg-blue-100 pb-32">
