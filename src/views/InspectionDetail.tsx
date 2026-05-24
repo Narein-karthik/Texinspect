@@ -52,6 +52,10 @@ export const InspectionDetail = () => {
     if (id) updateInspection(id, updates);
   };
 
+  const handleManualVerdict = (isPass: boolean) => {
+    handleUpdate({ isPass, verdictOverride: true });
+  };
+
   const addRoll = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -69,8 +73,31 @@ export const InspectionDetail = () => {
       startTime: new Date().toISOString(),
     };
 
+    const updatedRolls = [...inspection.rolls, newRoll];
+    const totalPoints = updatedRolls.reduce(
+      (sum, r) =>
+        sum + r.defects.reduce((dSum, d) => dSum + d.severity, 0),
+      0
+    );
+    const totalLength = updatedRolls.reduce(
+      (sum, r) => sum + r.lengthYards,
+      0
+    );
+    const avgWidth =
+      updatedRolls.length > 0 ? updatedRolls[0].widthInches : 0;
+    const pointsPer100 = calculateFourPointStats(
+      totalPoints,
+      totalLength,
+      avgWidth
+    );
+
     handleUpdate({
-      rolls: [...inspection.rolls, newRoll],
+      rolls: updatedRolls,
+      totalPoints,
+      pointsPer100Yds: pointsPer100,
+      isPass: inspection.verdictOverride
+        ? inspection.isPass
+        : getPassFailStatus(pointsPer100) === 'PASS',
     });
 
     setActiveRollId(newRoll.id);
@@ -134,7 +161,9 @@ export const InspectionDetail = () => {
       rolls: updatedRolls,
       totalPoints,
       pointsPer100Yds: pointsPer100,
-      isPass: getPassFailStatus(pointsPer100) === 'PASS',
+      isPass: inspection.verdictOverride
+        ? inspection.isPass
+        : getPassFailStatus(pointsPer100) === 'PASS',
     });
 
     setDefectComment('');
@@ -179,12 +208,51 @@ export const InspectionDetail = () => {
             </div>
 
             <div className="text-[9px] font-black uppercase tracking-widest opacity-60">
-              PTS / 100YD²
+              PTS / 100M²
             </div>
           </div>
 
           <div className="px-5 py-2 bg-white rounded-full font-black text-xs uppercase tracking-widest shadow-sm">
             {inspection.isPass ? 'PASS' : 'FAIL'}
+          </div>
+        </div>
+
+        <div className="bg-gray-50 rounded-[2rem] p-4 border border-gray-100">
+          <div className="flex items-center justify-between gap-3 mb-3">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-gray-400">
+                Manual Verdict
+              </div>
+              <div className="text-xs font-bold text-gray-500 mt-1">
+                Auto rule accepts reports at 40 points or below.
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <button
+              onClick={() => handleManualVerdict(true)}
+              className={cn(
+                'py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all',
+                inspection.isPass
+                  ? 'bg-green-600 text-white border-green-600'
+                  : 'bg-white text-green-700 border-green-200'
+              )}
+            >
+              Accept
+            </button>
+
+            <button
+              onClick={() => handleManualVerdict(false)}
+              className={cn(
+                'py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all',
+                !inspection.isPass
+                  ? 'bg-rose-600 text-white border-rose-600'
+                  : 'bg-white text-rose-700 border-rose-200'
+              )}
+            >
+              Reject
+            </button>
           </div>
         </div>
       </div>
@@ -222,7 +290,7 @@ export const InspectionDetail = () => {
               </div>
 
               <div className="text-sm font-black">
-                {roll.lengthYards} YDS
+                {roll.lengthYards} M
               </div>
 
               <div className="text-[10px] font-bold opacity-40">
@@ -304,7 +372,7 @@ export const InspectionDetail = () => {
                           </div>
 
                           <div className="text-[9px] font-bold text-gray-400 uppercase tracking-tighter">
-                            Pos: {defect.meterLocation} YDS
+                            Pos: {defect.meterLocation} M
                           </div>
                         </div>
                       </div>
@@ -344,6 +412,134 @@ export const InspectionDetail = () => {
           </button>
         </div>
       </div>
+
+      {/* ADD ROLL MODAL */}
+      <AnimatePresence>
+        {showAddRoll && (
+          <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddRoll(false)}
+              className="absolute inset-0 bg-black/40 backdrop-blur-sm"
+            />
+
+            <motion.div
+              initial={{ y: 200, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 200, opacity: 0 }}
+              className="relative w-full max-w-lg max-h-[90vh] overflow-y-auto bg-white rounded-[2rem] p-6 shadow-2xl"
+            >
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-900">
+                    Add Roll
+                  </h3>
+
+                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mt-1">
+                    Register a new roll for this inspection
+                  </p>
+                </div>
+
+                <button
+                  onClick={() => setShowAddRoll(false)}
+                  className="p-2 bg-gray-50 rounded-full"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <form onSubmit={addRoll} className="space-y-4">
+                <div className="space-y-1">
+                  <label className="text-xs font-bold text-gray-400 uppercase">
+                    Roll Number
+                  </label>
+
+                  <input
+                    name="rollNumber"
+                    required
+                    placeholder="1"
+                    className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">
+                      Length (M)
+                    </label>
+
+                    <input
+                      type="number"
+                      name="lengthYards"
+                      required
+                      min="0"
+                      step="0.01"
+                      placeholder="125"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">
+                      Width
+                    </label>
+
+                    <input
+                      type="number"
+                      name="widthInches"
+                      required
+                      min="0"
+                      step="0.01"
+                      placeholder="58"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">
+                      Weight
+                    </label>
+
+                    <input
+                      type="number"
+                      name="weightKg"
+                      min="0"
+                      step="0.01"
+                      placeholder="Optional"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <label className="text-xs font-bold text-gray-400 uppercase">
+                      Shade
+                    </label>
+
+                    <input
+                      name="shade"
+                      placeholder="Optional"
+                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="sticky bottom-0 bg-white pt-4">
+                  <button
+                    type="submit"
+                    className="w-full py-4 bg-blue-600 text-white font-bold rounded-2xl hover:bg-blue-700 transition-all shadow-lg shadow-blue-200 active:scale-95"
+                  >
+                    Add Roll
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* ADD DEFECT MODAL */}
       <AnimatePresence>

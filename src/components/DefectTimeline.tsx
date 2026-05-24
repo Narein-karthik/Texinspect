@@ -3,7 +3,7 @@ import { Defect } from '../types';
 import { cn } from '../lib/utils';
 
 interface DefectTimelineProps {
-  length: number; // in yards
+  length: number; // in meters
   defects: Defect[];
   onDefectClick?: (defect: Defect) => void;
 }
@@ -57,7 +57,7 @@ export const DefectTimeline: React.FC<DefectTimelineProps> = ({ length, defects,
                   {/* Floating Indicator */}
                   <div className="absolute -top-8 left-1/2 -translate-x-1/2 opacity-0 group-hover/marker:opacity-100 transition-all scale-75 group-hover/marker:scale-100 pointer-events-none">
                     <div className="bg-gray-900 text-white text-[10px] px-2 py-1 rounded shadow-xl whitespace-nowrap font-black">
-                      {defect.type} @ {defect.meterLocation}yd
+                      {defect.type} @ {defect.meterLocation} m
                     </div>
                   </div>
                 </button>
@@ -72,7 +72,7 @@ export const DefectTimeline: React.FC<DefectTimelineProps> = ({ length, defects,
               return (
                 <div key={i} className="flex flex-col items-center gap-1.5">
                   <div className="w-0.5 h-2 bg-gray-200 rounded-full" />
-                  <span className="text-[10px] font-black text-gray-300 tracking-tighter">{val}y</span>
+                  <span className="text-[10px] font-black text-gray-300 tracking-tighter">{val} m</span>
                 </div>
               );
             })}

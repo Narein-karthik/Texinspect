@@ -99,6 +99,7 @@ export interface Inspection {
   totalPoints: number;
   pointsPer100Yds: number;
   isPass: boolean;
+  verdictOverride?: boolean;
   logs: ActivityLog[];
 }
 

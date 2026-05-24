@@ -50,6 +50,19 @@
   }
 }
 
+.report-screen {
+  overflow-x: hidden;
+}
+
+.report-document {
+  overflow: visible;
+}
+
+.avoid-page-break {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
 @media print {
   .print\:hidden { display: none !important; }
   .print\:p-0 { padding: 0 !important; }
@@ -61,9 +74,16 @@ body {
   padding-bottom: 90px;
 }
 @media print {
+  html,
+  body,
+  #root {
+    height: auto !important;
+    overflow: visible !important;
+  }
 
   body {
     background: white !important;
+    padding-bottom: 0 !important;
   }
 
   .print\:hidden {
@@ -83,7 +103,15 @@ body {
     page-break-after: auto;
   }
 
-  section {
+  .report-document {
+    width: 190mm !important;
+    max-width: 190mm !important;
+    min-height: auto !important;
+    background: white !important;
+  }
+
+  .avoid-page-break {
+    break-inside: avoid;
     page-break-inside: avoid;
   }
 

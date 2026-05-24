@@ -1,10 +1,9 @@
 import React from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
-import { useReactToPrint } from 'react-to-print';
 import {
   ArrowLeft,
-  Printer
+  Download
 } from 'lucide-react';
 
 import {
@@ -26,6 +25,10 @@ export const ReportView = () => {
   const navigate = useNavigate();
 
   const inspections = useStore((state) => state.inspections);
+  const updateInspection = useStore((state) => state.updateInspection);
+  const currentUser = useStore((state) => state.currentUser);
+  const [isPrinting, setIsPrinting] = React.useState(false);
+  const reportRef = React.useRef<HTMLDivElement>(null);
   console.log("ALL INSPECTIONS:", inspections);
 
   const inspection = inspections.find((i) => i.id === id);
@@ -38,60 +41,175 @@ export const ReportView = () => {
     );
   }
 
-  const [isPrinting, setIsPrinting] = React.useState(false);
-  const reportRef = React.useRef<HTMLDivElement>(null);
+  const handleDownloadPdf = async () => {
+    if (!reportRef.current) return;
 
-  const handlePrint = useReactToPrint({
-    contentRef: reportRef,
+    setIsPrinting(true);
 
-    documentTitle: `TexInspect_Report_${inspection.id}`,
+    try {
+      await document.fonts.ready;
+      const printWindow = window.open('', '_blank', 'width=900,height=1200');
 
-    onBeforePrint: async () => {
-      setIsPrinting(true);
-    },
+      if (!printWindow) {
+        window.print();
+        return;
+      }
 
-    onAfterPrint: () => {
-      setIsPrinting(false);
-    },
-  });
+      const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+        .map((node) => node.outerHTML)
+        .join('\n');
+
+      printWindow.document.open();
+      printWindow.document.write(`
+        <!doctype html>
+        <html>
+          <head>
+            <title>TexInspect Report</title>
+            ${styles}
+            <style>
+              html, body, #root {
+                height: auto !important;
+                overflow: visible !important;
+                background: #ffffff !important;
+              }
+
+              body {
+                margin: 0 !important;
+                padding: 0 !important;
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+
+              #report-content {
+                width: 190mm !important;
+                max-width: 190mm !important;
+                min-height: auto !important;
+                margin: 0 auto !important;
+                background: #ffffff !important;
+                box-shadow: none !important;
+              }
+
+              table {
+                width: 100% !important;
+                min-width: 0 !important;
+                table-layout: fixed;
+              }
+
+              th, td {
+                word-break: break-word;
+              }
+
+              tr,
+              .avoid-page-break {
+                break-inside: avoid;
+                page-break-inside: avoid;
+              }
+
+              @page {
+                size: A4;
+                margin: 10mm;
+              }
+            </style>
+          </head>
+          <body>
+            ${reportRef.current.outerHTML}
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+
+      window.setTimeout(() => {
+        printWindow.focus();
+        printWindow.print();
+        printWindow.close();
+      }, 500);
+    } finally {
+      window.setTimeout(() => setIsPrinting(false), 800);
+    }
+  };
 
   const totalLength = inspection.rolls.reduce((s, r) => s + r.lengthYards, 0);
+  const canEditVerdict = currentUser?.role !== 'ADMIN';
+
+  const handleManualVerdict = (isPass: boolean) => {
+    if (!id) return;
+    updateInspection(id, { isPass, verdictOverride: true });
+  };
 
   return (
-    <div className="space-y-8 pb-32 bg-[#F5F5F7] p-4 md:p-8 lg:p-12 print:p-0">
+    <div className="report-screen space-y-5 pb-32 bg-[#F5F5F7] px-3 py-4 sm:p-6 md:p-8 lg:p-12 print:p-0">
 
       {/* TOP ACTIONS */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 max-w-[8.5in] mx-auto w-full print:hidden">
+      <header className="flex flex-row justify-between items-center gap-3 max-w-[8.5in] mx-auto w-full print:hidden">
 
         <button
           onClick={() => navigate(-1)}
-          className="flex items-center gap-3 text-gray-900 font-black uppercase tracking-widest text-[10px] bg-white p-4 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-600 transition-colors"
+          className="flex items-center gap-2 text-gray-900 font-black uppercase tracking-widest text-[10px] bg-white px-4 py-3 rounded-2xl shadow-sm border border-gray-100 hover:border-blue-600 transition-colors"
         >
           <ArrowLeft size={16} />
           Back
         </button>
 
         <button
-          onClick={handlePrint}
+          onClick={handleDownloadPdf}
           disabled={isPrinting}
-          className="p-4 bg-gray-900 text-white rounded-2xl flex items-center gap-3 text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
+          className="px-4 py-3 bg-gray-900 text-white rounded-2xl flex items-center gap-2 text-[10px] font-black uppercase tracking-widest shadow-xl hover:bg-gray-700 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
         >
-          <Printer size={18} />
-          {isPrinting ? 'Generating...' : 'Generate PDF'}
+          <Download size={18} />
+          {isPrinting ? 'Generating...' : 'Download PDF'}
         </button>
 
       </header>
+
+      {canEditVerdict && (
+        <div className="max-w-[8.5in] mx-auto w-full print:hidden">
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-[9px] font-black uppercase tracking-widest text-gray-400">
+                Manual Verdict
+              </p>
+              <p className="text-xs font-bold text-gray-700 mt-1">
+                Auto rule: accepted when points are 40 or below.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 shrink-0">
+              <button
+                onClick={() => handleManualVerdict(true)}
+                className={cn(
+                  'px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all',
+                  inspection.isPass
+                    ? 'bg-green-600 text-white border-green-600'
+                    : 'bg-white text-green-700 border-green-200'
+                )}
+              >
+                Accept
+              </button>
+              <button
+                onClick={() => handleManualVerdict(false)}
+                className={cn(
+                  'px-3 py-2 rounded-2xl text-[10px] font-black uppercase tracking-widest border transition-all',
+                  !inspection.isPass
+                    ? 'bg-red-600 text-white border-red-600'
+                    : 'bg-white text-red-700 border-red-200'
+                )}
+              >
+                Reject
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* REPORT */}
       <div
         id="report-content"
         ref={reportRef}
-        style={{ minHeight: 'auto' }}
-        className="bg-[#F5F5F7] mx-auto w-[210mm] min-h-[297mm] print:w-[210mm] print:min-h-[297mm] relative flex flex-col text-gray-900 font-sans shadow-xl print:shadow-none"
+        className="report-document bg-[#F5F5F7] mx-auto w-full max-w-[210mm] print:w-[210mm] print:min-h-[297mm] relative flex flex-col text-gray-900 font-sans shadow-xl print:shadow-none"
       >
 
         {/* ── HEADER CARD ─────────────────────────────────────── */}
-        <section className="bg-white rounded-3xl p-5 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
+        <section className="report-section avoid-page-break bg-white rounded-3xl p-4 sm:p-5 md:p-8 shadow-sm border border-gray-100 relative overflow-hidden">
 
           {/* Watermark inside header */}
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 pointer-events-none select-none opacity-[0.04] rotate-[-35deg] whitespace-nowrap z-0">
@@ -103,28 +221,28 @@ export const ReportView = () => {
           <div className="relative z-10 flex flex-col gap-5 border-b-4 border-gray-900 pb-6 md:pb-8">
 
             {/* Logo + Cert ref row */}
-            <div className="flex items-start justify-between gap-3">
+            <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-4">
 
               <div className="flex items-center gap-3 min-w-0">
                 <div className="bg-gray-900 text-white p-2.5 md:p-3 rounded-xl font-black text-xl md:text-2xl shrink-0">
                   TX
                 </div>
                 <div className="min-w-0">
-                  <div className="text-[11px] md:text-[12px] font-black uppercase tracking-[0.3em] md:tracking-[0.4em] text-gray-900 leading-tight">
+                  <div className="text-[10px] sm:text-[11px] md:text-[12px] font-black uppercase tracking-[0.18em] sm:tracking-[0.3em] md:tracking-[0.4em] text-gray-900 leading-tight">
                     TexInspect Industrial
                   </div>
-                  <div className="text-[8px] md:text-[9px] font-bold text-gray-400 uppercase tracking-widest">
-                    Quality Assurance Division • ISO 9001:2015
+                  <div className="text-[8px] md:text-[9px] font-bold text-gray-400 uppercase tracking-[0.08em] sm:tracking-widest">
+                    Quality Assurance Division / ISO 9001:2015
                   </div>
                 </div>
               </div>
 
-              <div className="shrink-0">
+              <div className="shrink-0 w-full sm:w-auto">
                 <div className="bg-gray-900 text-white px-3 md:px-6 py-3 md:py-4 rounded-2xl">
                   <div className="text-[8px] font-black uppercase tracking-widest opacity-60 mb-0.5">
                     Cert. Ref.
                   </div>
-                  <div className="text-sm md:text-xl font-mono font-bold tracking-tighter">
+                  <div className="text-sm md:text-xl font-mono font-bold tracking-tighter break-all">
                     TIC-{inspection.id.slice(0, 8).toUpperCase()}
                   </div>
                   <div className="text-[7px] font-black uppercase tracking-widest opacity-40 mt-1">
@@ -140,7 +258,7 @@ export const ReportView = () => {
               <div className="text-[10px] font-black text-gray-400 uppercase tracking-widest">
                 Customer Registry
               </div>
-              <h1 className="text-2xl md:text-5xl font-black tracking-tighter uppercase leading-none text-gray-900">
+              <h1 className="text-3xl md:text-5xl font-black uppercase leading-none text-gray-900 break-words">
                 {inspection.customerName}
               </h1>
             </div>
@@ -182,25 +300,25 @@ export const ReportView = () => {
         </section>
 
         {/* ── KPI CARDS ────────────────────────────────────────── */}
-        <section className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+        <section className="report-section grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mt-4">
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col gap-1">
+          <div className="avoid-page-break bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-1">
             <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
               Yield Points
             </div>
-            <div className="text-4xl font-black text-blue-600 leading-none mt-1">
+            <div className="text-3xl md:text-4xl font-black text-blue-600 leading-none mt-1">
               {inspection.pointsPer100Yds.toFixed(1)}
             </div>
             <div className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">
-              per 100 meters
+              per 100 sq meters
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col gap-1">
+          <div className="avoid-page-break bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-1">
             <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
               Total Length
             </div>
-            <div className="text-4xl font-black text-gray-900 leading-none mt-1">
+            <div className="text-3xl md:text-4xl font-black text-gray-900 leading-none mt-1">
               {totalLength}
             </div>
             <div className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">
@@ -208,11 +326,11 @@ export const ReportView = () => {
             </div>
           </div>
 
-          <div className="bg-white rounded-3xl p-6 shadow-sm border border-gray-100 flex flex-col gap-1">
+          <div className="avoid-page-break bg-white rounded-3xl p-4 md:p-6 shadow-sm border border-gray-100 flex flex-col gap-1">
             <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
               Unit Count
             </div>
-            <div className="text-4xl font-black text-gray-900 leading-none mt-1">
+            <div className="text-3xl md:text-4xl font-black text-gray-900 leading-none mt-1">
               {inspection.rolls.length}
             </div>
             <div className="text-[9px] text-gray-400 font-bold uppercase tracking-wider mt-1">
@@ -221,7 +339,7 @@ export const ReportView = () => {
           </div>
 
           <div className={cn(
-            "rounded-3xl p-6 shadow-sm border flex flex-col items-center justify-center gap-2",
+            "avoid-page-break rounded-3xl p-4 md:p-6 shadow-sm border flex flex-col items-center justify-center gap-2",
             inspection.isPass
               ? "bg-green-500 border-green-400"
               : "bg-red-500 border-red-400"
@@ -229,7 +347,7 @@ export const ReportView = () => {
             <div className="text-[9px] font-black text-white/70 uppercase tracking-widest">
               Verdict
             </div>
-            <div className="text-2xl font-black text-white tracking-[0.15em]">
+            <div className="max-w-full px-1 text-center text-[11px] sm:text-sm md:text-xl font-black text-white tracking-[0.04em] sm:tracking-[0.08em] leading-tight break-words">
               {inspection.isPass ? 'ACCEPTED' : 'REJECTED'}
             </div>
           </div>
@@ -260,10 +378,10 @@ export const ReportView = () => {
           ];
 
           return (
-            <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mt-4 space-y-6">
+            <section className="report-section bg-white rounded-3xl p-4 md:p-8 shadow-sm border border-gray-100 mt-4 space-y-6">
 
-              <div className="flex items-center justify-between">
-                <h3 className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-900">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <h3 className="text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.5em] text-gray-900">
                   Defect Analytics
                 </h3>
                 <span className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
@@ -275,11 +393,11 @@ export const ReportView = () => {
                 {analytics.map(({ label, count, color, bar, bg, border }) => {
                   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
                   return (
-                    <div key={label} className={`rounded-2xl p-5 border ${bg} ${border} flex flex-col gap-3`}>
+                    <div key={label} className={`avoid-page-break rounded-2xl p-4 md:p-5 border ${bg} ${border} flex flex-col gap-3`}>
                       <div className="text-[9px] font-black text-gray-400 uppercase tracking-widest">
                         {label}
                       </div>
-                      <div className={`text-4xl font-black leading-none ${color}`}>
+                      <div className={`text-3xl md:text-4xl font-black leading-none ${color}`}>
                         {count}
                       </div>
                       <div className="space-y-1">
@@ -299,7 +417,7 @@ export const ReportView = () => {
               </div>
 
               {defectTrendData.length > 0 && (
-                <div className="bg-gray-50 rounded-3xl p-6 border border-gray-100">
+                <div className="bg-gray-50 rounded-3xl p-4 md:p-6 border border-gray-100">
 
                   <div className="flex items-center justify-between mb-6">
                     <div>
@@ -375,14 +493,14 @@ export const ReportView = () => {
         })()}
 
         {/* ── ROLL DATA TABLE ───────────────────────────────────── */}
-        <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mt-4 space-y-6">
+        <section className="report-section bg-white rounded-3xl p-4 md:p-8 shadow-sm border border-gray-100 mt-4 space-y-6">
 
-          <h3 className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-900">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.5em] text-gray-900">
             Detailed Roll Data
           </h3>
 
           <div className="overflow-x-auto print:overflow-visible rounded-2xl border border-gray-200">
-            <table className="min-w-[900px] print:min-w-0 w-full text-sm print:text-[10px] text-left border-collapse">
+            <table className="min-w-[620px] print:min-w-0 w-full text-xs md:text-sm print:text-[10px] text-left border-collapse">
 
               <thead>
                 <tr className="bg-gray-100 text-[9px] uppercase font-black text-gray-500">
@@ -429,9 +547,9 @@ export const ReportView = () => {
         {/* ── DEFECT IMAGES ─────────────────────────────────────── */}
         {inspection.rolls.some(r => r.defects.some(d => d.photoUrl)) && (
 
-          <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mt-4 space-y-6">
+          <section className="report-section bg-white rounded-3xl p-4 md:p-8 shadow-sm border border-gray-100 mt-4 space-y-6">
 
-            <h3 className="text-[10px] font-black uppercase tracking-[0.5em] text-gray-900">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.25em] sm:tracking-[0.5em] text-gray-900">
               Defect Images
             </h3>
 
@@ -444,7 +562,7 @@ export const ReportView = () => {
 
                 <div
                   key={defect.id}
-                  className="border border-gray-200 rounded-2xl overflow-hidden"
+                  className="avoid-page-break border border-gray-200 rounded-2xl overflow-hidden"
                 >
                   <img
                     src={defect.photoUrl}
@@ -487,7 +605,7 @@ export const ReportView = () => {
         )}
 
         {/* ── SIGNATURE ─────────────────────────────────────────── */}
-        <section className="bg-white rounded-3xl p-8 shadow-sm border border-gray-100 mt-4">
+        <section className="report-section avoid-page-break bg-white rounded-3xl p-4 md:p-8 shadow-sm border border-gray-100 mt-4">
 
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-6">
 

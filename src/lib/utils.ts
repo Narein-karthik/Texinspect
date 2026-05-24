@@ -6,17 +6,18 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * ASTM D5430 4-Point System Calculation
- * Formula: (Total Points * 3600) / (Length in Yards * Width in Inches)
+ * 4-Point System Calculation using metric length.
+ * Formula: (Total Points * 100) / (Length in Meters * Width in Meters)
  */
 export function calculateFourPointStats(
   totalPoints: number,
-  lengthYards: number,
+  lengthMeters: number,
   widthInches: number
 ) {
-  if (lengthYards <= 0 || widthInches <= 0) return 0;
-  const pointsPer100SqYds = (totalPoints * 3600) / (lengthYards * widthInches);
-  return Number(pointsPer100SqYds.toFixed(2));
+  const widthMeters = widthInches * 0.0254;
+  if (lengthMeters <= 0 || widthMeters <= 0) return 0;
+  const pointsPer100SqMeters = (totalPoints * 100) / (lengthMeters * widthMeters);
+  return Number(pointsPer100SqMeters.toFixed(2));
 }
 
 export function getPassFailStatus(points: number, threshold: number = 40) {

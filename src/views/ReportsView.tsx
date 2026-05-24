@@ -1,25 +1,28 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
-import { FileText, ArrowRight } from 'lucide-react';
+import { FileText, ArrowRight, Download } from 'lucide-react';
 import { format } from 'date-fns';
 
 export const ReportsView = () => {
   const navigate = useNavigate();
 
   const inspections = useStore((state) => state.inspections);
+  const currentUser = useStore((state) => state.currentUser);
 
   console.log("ALL INSPECTIONS:", inspections);
 
   return (
     <div className="space-y-6 pb-32">
       <div>
-        <h1 className="text-2xl font-black text-gray-900">
-          Inspection Reports
+          <h1 className="text-2xl font-black text-gray-900">
+          {currentUser?.role === 'ADMIN' ? 'All Inspection Reports' : 'Inspection Reports'}
         </h1>
 
         <p className="text-gray-500 mt-1">
-          View all generated inspection reports
+          {currentUser?.role === 'ADMIN'
+            ? 'Track inspectors, customers, style numbers, and downloads'
+            : 'View all generated inspection reports'}
         </p>
       </div>
 
@@ -58,6 +61,10 @@ export const ReportsView = () => {
                 <div className="mt-2 text-xs text-gray-400 uppercase tracking-wider">
                   Inspector: {inspection.inspectorName}
                 </div>
+
+                <div className="mt-1 text-xs text-gray-400 uppercase tracking-wider">
+                  Style: {inspection.styleRef || 'N/A'} / Order: {inspection.orderNumber || 'N/A'}
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
@@ -71,7 +78,11 @@ export const ReportsView = () => {
                   {inspection.isPass ? 'PASS' : 'FAIL'}
                 </div>
 
-                <ArrowRight className="text-gray-400" />
+                {currentUser?.role === 'ADMIN' ? (
+                  <Download className="text-gray-400" />
+                ) : (
+                  <ArrowRight className="text-gray-400" />
+                )}
               </div>
             </button>
           ))}
