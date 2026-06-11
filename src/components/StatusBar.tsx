@@ -5,7 +5,7 @@ import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { inspectionService } from '../services/inspectionService';
 
-export const StatusBar = () => {
+export const StatusBar = ({ displayMode = 'mobile' }: { displayMode?: 'mobile' | 'desktop' }) => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const inspections = useStore((state) => state.inspections);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -57,7 +57,7 @@ export const StatusBar = () => {
       animate={{ y: 0, opacity: 1 }}
       className="
         fixed top-2 left-1/2 -translate-x-1/2
-        w-[92%] max-w-md
+        w-[92%]
         h-14
         px-4
         bg-[#1B2236]/95
@@ -68,6 +68,7 @@ export const StatusBar = () => {
         flex items-center justify-between
         z-50
       "
+      style={{ maxWidth: displayMode === 'desktop' ? '48rem' : '28rem' }}
     >
       {/* LEFT SIDE */}
       <div className="flex items-center gap-2">

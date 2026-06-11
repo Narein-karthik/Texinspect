@@ -1,11 +1,24 @@
 import React from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
-import { Home, PlusSquare, FileText, ShieldCheck, UserCheck, UserPlus } from 'lucide-react';
+import {
+  FileText,
+  Home,
+  Monitor,
+  PlusSquare,
+  RefreshCw,
+  ShieldCheck,
+  Smartphone,
+  UserCheck,
+  UserPlus,
+} from 'lucide-react';
 import { motion } from 'motion/react';
 import { cn } from '../lib/utils';
 import { useStore } from '../store';
 import { signInWithGoogle } from '../lib/firebase';
 import { StatusBar } from './StatusBar';
+
+type DisplayMode = 'mobile' | 'desktop';
+const DISPLAY_MODE_KEY = 'tex-inspect-display-mode';
 
 const LoginScreen = () => {
   const [loadingAction, setLoadingAction] = React.useState<'INSPECTOR_SIGN_IN' | 'ADMIN_SIGN_IN' | 'INSPECTOR_SIGN_UP' | null>(null);
@@ -155,6 +168,15 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   const location = useLocation();
 
   const currentUser = useStore((state) => state.currentUser);
+  const touchStartY = React.useRef<number | null>(null);
+  const pullDistanceRef = React.useRef(0);
+  const [pullDistance, setPullDistance] = React.useState(0);
+  const [isRefreshing, setIsRefreshing] = React.useState(false);
+  const [displayMode, setDisplayMode] = React.useState<DisplayMode>(() => {
+    const savedMode = localStorage.getItem(DISPLAY_MODE_KEY);
+    if (savedMode === 'mobile' || savedMode === 'desktop') return savedMode;
+    return window.innerWidth >= 900 ? 'desktop' : 'mobile';
+  });
 
   const [isOnline, setIsOnline] = React.useState(navigator.onLine);
 
@@ -171,6 +193,61 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
     };
   }, []);
 
+  const changeDisplayMode = (mode: DisplayMode) => {
+    setDisplayMode(mode);
+    localStorage.setItem(DISPLAY_MODE_KEY, mode);
+  };
+
+  const handleTouchStart = (event: React.TouchEvent<HTMLDivElement>) => {
+    const scrollContainer = document.getElementById('root');
+
+    if (
+      isRefreshing ||
+      event.touches.length !== 1 ||
+      (scrollContainer?.scrollTop ?? 0) > 0
+    ) {
+      touchStartY.current = null;
+      return;
+    }
+
+    touchStartY.current = event.touches[0].clientY;
+  };
+
+  const handleTouchMove = (event: React.TouchEvent<HTMLDivElement>) => {
+    if (touchStartY.current === null || isRefreshing) return;
+
+    const scrollContainer = document.getElementById('root');
+    if ((scrollContainer?.scrollTop ?? 0) > 0) {
+      touchStartY.current = null;
+      pullDistanceRef.current = 0;
+      setPullDistance(0);
+      return;
+    }
+
+    const distance = event.touches[0].clientY - touchStartY.current;
+    const resistedDistance = distance > 0 ? Math.min(distance * 0.45, 96) : 0;
+
+    pullDistanceRef.current = resistedDistance;
+    setPullDistance(resistedDistance);
+  };
+
+  const handleTouchEnd = () => {
+    touchStartY.current = null;
+
+    if (pullDistanceRef.current >= 64) {
+      setIsRefreshing(true);
+      setPullDistance(56);
+
+      window.setTimeout(() => {
+        window.location.reload();
+      }, 350);
+      return;
+    }
+
+    pullDistanceRef.current = 0;
+    setPullDistance(0);
+  };
+
   if (!currentUser) {
     return <LoginScreen />;
   }
@@ -185,15 +262,67 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
         { icon: PlusSquare, label: 'New', path: '/new' },
         { icon: FileText, label: 'Reports', path: '/reports' },
       ];
+  const isDesktopMode = displayMode === 'desktop';
+  const showNavigation = !location.pathname.startsWith('/reports/');
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA] text-gray-900 font-sans selection:bg-blue-100 pb-32">
+    <div
+      className={cn(
+        'min-h-screen bg-[#F8F9FA] text-gray-900 font-sans selection:bg-blue-100 transition-colors duration-300',
+        isDesktopMode ? 'pb-8' : 'pb-32'
+      )}
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
+    >
 
-      <StatusBar />
+      <StatusBar displayMode={displayMode} />
 
-      <main className="max-w-xl mx-auto p-4 pt-20 pb-24 animate-in">
+      <div
+        className="fixed left-1/2 z-40 flex -translate-x-1/2 items-center gap-2 rounded-full bg-gray-900 px-4 py-2 text-white shadow-xl transition-[opacity,transform] duration-200 pointer-events-none"
+        style={{
+          top: '72px',
+          opacity: pullDistance > 8 || isRefreshing ? 1 : 0,
+          transform: `translate(-50%, ${Math.max(-18, pullDistance - 42)}px)`,
+        }}
+      >
+        <RefreshCw
+          size={15}
+          className={isRefreshing ? 'animate-spin' : ''}
+          style={{ transform: isRefreshing ? undefined : `rotate(${pullDistance * 3}deg)` }}
+        />
+        <span className="text-[9px] font-black uppercase tracking-widest">
+          {isRefreshing
+            ? 'Refreshing'
+            : pullDistance >= 64
+              ? 'Release to refresh'
+              : 'Pull to refresh'}
+        </span>
+      </div>
 
-        <header className="flex items-center justify-between py-6 mb-2">
+      <motion.main
+        layout
+        transition={{ layout: { duration: 0.28, ease: 'easeOut' } }}
+        className={cn(
+          'mx-auto p-4 pt-20 animate-in transition-transform duration-150',
+          isDesktopMode
+            ? 'max-w-6xl px-6 pb-10'
+            : 'max-w-xl pb-24'
+        )}
+        style={{
+          transform: pullDistance > 0
+            ? `translateY(${Math.min(pullDistance * 0.35, 24)}px)`
+            : undefined,
+        }}
+      >
+
+        <motion.header
+          layout
+          initial={{ opacity: 0, y: -8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="flex flex-wrap items-center justify-between gap-4 py-6 mb-2"
+        >
 
           <h1 className="text-xl font-black tracking-tight text-gray-900 flex items-center gap-2">
             <span className="bg-gray-900 text-white p-1.5 rounded-lg text-lg">
@@ -203,41 +332,122 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
             TEXINSPECT
           </h1>
 
-          <button
-            onClick={() => navigate('/profile')}
-            className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-200 active:scale-90 transition-all overflow-hidden"
-          >
-            {currentUser.name.charAt(0)}
-          </button>
+          {isDesktopMode && showNavigation && (
+            <motion.nav
+              initial={{ opacity: 0, y: -6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="order-3 flex w-full items-center justify-center gap-1 rounded-2xl border border-gray-200 bg-white p-1.5 shadow-sm md:order-none md:w-auto"
+            >
+              {navItems.map((item) => {
+                const isActive = location.pathname === item.path;
 
-        </header>
+                return (
+                  <motion.button
+                    key={item.path}
+                    onClick={() => navigate(item.path)}
+                    whileHover={{ y: -1 }}
+                    whileTap={{ scale: 0.96 }}
+                    className={cn(
+                      'relative flex h-10 items-center gap-2 rounded-xl px-3 text-xs font-black uppercase transition-colors lg:px-4',
+                      isActive
+                        ? 'bg-gray-900 text-white'
+                        : 'text-gray-400 hover:bg-gray-50 hover:text-gray-900'
+                    )}
+                    >
+                      <item.icon size={16} />
+                      <span className="hidden sm:inline">{item.label}</span>
+                  </motion.button>
+                );
+              })}
+            </motion.nav>
+          )}
 
-        {children}
+          <div className="flex items-center gap-2">
+            <div
+              className="flex items-center rounded-xl border border-gray-200 bg-white p-1 shadow-sm"
+              aria-label="Display mode"
+            >
+              <button
+                type="button"
+                onClick={() => changeDisplayMode('mobile')}
+                title="Mobile layout"
+                aria-label="Use mobile layout"
+                aria-pressed={!isDesktopMode}
+                className={cn(
+                  'w-8 h-8 rounded-lg flex items-center justify-center transition-all',
+                  !isDesktopMode
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-400 hover:text-gray-900'
+                )}
+              >
+                <Smartphone size={15} />
+              </button>
 
-      </main>
+              <button
+                type="button"
+                onClick={() => changeDisplayMode('desktop')}
+                title="Desktop layout"
+                aria-label="Use desktop layout"
+                aria-pressed={isDesktopMode}
+                className={cn(
+                  'w-8 h-8 rounded-lg flex items-center justify-center transition-all',
+                  isDesktopMode
+                    ? 'bg-gray-900 text-white shadow-sm'
+                    : 'text-gray-400 hover:text-gray-900'
+                )}
+              >
+                <Monitor size={15} />
+              </button>
+            </div>
+
+            <motion.button
+              onClick={() => navigate('/profile')}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.92 }}
+              className="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white font-bold shadow-lg shadow-blue-200 overflow-hidden"
+            >
+              {currentUser.name.charAt(0)}
+            </motion.button>
+          </div>
+
+        </motion.header>
+
+        <motion.div
+          key={`${displayMode}-${location.pathname}`}
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+        >
+          {children}
+        </motion.div>
+
+      </motion.main>
 
       {/* Bottom Navigation */}
-      {!location.pathname.startsWith("/reports/") && (
+      {!isDesktopMode && showNavigation && (
 
-      <nav
-  className="
-  fixed bottom-0 left-1/2 -translate-x-1/2
-  w-full max-w-xl
-  bg-gray-900/95
-  backdrop-blur-xl
-  border-t border-white/10
-  rounded-t-3xl
-  px-6 py-4
-  flex justify-around items-center
-  z-50
-"
->
+      <motion.nav
+        initial={{ y: 80, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="
+          fixed bottom-0 left-1/2 -translate-x-1/2
+          w-full max-w-xl
+          bg-gray-900/95
+          backdrop-blur-xl
+          border-t border-white/10
+          rounded-t-3xl
+          px-6 py-4
+          flex justify-around items-center
+          z-50
+        "
+      >
 
         {navItems.map((item) => (
 
-          <button
+          <motion.button
             key={item.path}
             onClick={() => navigate(item.path)}
+            whileTap={{ scale: 0.88 }}
             className={cn(
               "flex flex-col items-center gap-1 transition-all touch-target",
               location.pathname === item.path
@@ -254,11 +464,11 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
               {item.label}
             </span>
 
-          </button>
+          </motion.button>
 
         ))}
 
-      </nav>
+      </motion.nav>
       )}
 
     </div>
