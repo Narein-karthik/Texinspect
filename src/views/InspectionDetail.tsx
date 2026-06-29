@@ -56,6 +56,11 @@ export const InspectionDetail = () => {
     handleUpdate({ isPass, verdictOverride: true });
   };
 
+  const completeInspection = () => {
+    handleUpdate({ status: 'COMPLETED' });
+    navigate(`/reports/${inspection.id}?edit=final`);
+  };
+
   const addRoll = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
 
@@ -405,10 +410,12 @@ export const InspectionDetail = () => {
           </button>
 
           <button
-            onClick={() => handleUpdate({ status: 'COMPLETED' })}
-            className="w-14 h-14 bg-white/10 rounded-2xl flex items-center justify-center active:scale-95 transition-all"
+            onClick={completeInspection}
+            className="shrink-0 px-4 sm:px-5 h-14 bg-white/10 rounded-2xl flex items-center justify-center gap-2 active:scale-95 transition-all text-[10px] font-black uppercase tracking-widest text-blue-100"
           >
             <CheckCircle2 size={24} className="text-blue-400" />
+            <span className="hidden sm:inline">Finish Report</span>
+            <span className="sm:hidden">Finish</span>
           </button>
         </div>
       </div>

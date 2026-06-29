@@ -63,6 +63,21 @@
   page-break-inside: avoid;
 }
 
+.report-page-one {
+  break-after: page;
+  page-break-after: always;
+}
+
+.report-page-two {
+  break-after: page;
+  page-break-after: always;
+}
+
+.report-page-three {
+  break-after: auto;
+  page-break-after: auto;
+}
+
 @media print {
   .print\:hidden { display: none !important; }
   .print\:p-0 { padding: 0 !important; }

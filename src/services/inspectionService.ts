@@ -13,6 +13,7 @@ import {
 
 import { db, auth } from '../lib/firebase';
 import { Inspection } from '../types';
+import { getCertificateRef, getDefaultFabricConstruction } from '../lib/utils';
 
 enum OperationType {
   CREATE = 'create',
@@ -86,6 +87,15 @@ export const inspectionService = {
       const cleanedInspection = JSON.parse(
         JSON.stringify({
           ...inspection,
+          certificateRef: getCertificateRef(inspection),
+          fabricConstruction: getDefaultFabricConstruction(
+            inspection.fabricType,
+            inspection.fabricConstruction || {
+              gsm: inspection.gsm,
+              width: '',
+              additionalData: '',
+            }
+          ),
           updatedAt: new Date().toISOString()
         })
       );

@@ -1,5 +1,55 @@
 export type SyncStatus = 'LOCAL_ONLY' | 'PENDING_SYNC' | 'SYNCED' | 'ERROR';
 export type UserRole = 'INSPECTOR' | 'MANAGER' | 'ADMIN';
+export type FabricType = 'Woven' | 'Knitted' | 'Non-Woven';
+
+export interface FabricConstruction {
+  warpCount?: string;
+  weftCount?: string;
+  reed?: string;
+  pick?: string;
+  count1?: string;
+  count2?: string;
+  count3?: string;
+  structure?: string;
+  gsm?: number;
+  width?: string;
+  additionalData?: string;
+}
+
+export interface QuantitySummary {
+  uom?: 'Meters' | 'Kgs' | 'Pcs' | 'Others';
+  customUom?: string;
+  orderedQty?: number;
+  producedQty?: number;
+  offeredQty?: number;
+  inspectedQty?: number;
+  acceptedQty?: number;
+  rejectedQty?: number;
+  orderedRolls?: number;
+  producedRolls?: number;
+  offeredRolls?: number;
+  inspectedRolls?: number;
+  acceptedRolls?: number;
+  rejectedRolls?: number;
+  rejectedFourPointQty?: number;
+  rejectedOtherQty?: number;
+  rejectedFourPointRolls?: number;
+  rejectedOtherRolls?: number;
+  defectiveLinearMeters?: number;
+  otherRejectedMeters?: number;
+  rollLengthDiscrepancyMeters?: number;
+  replacementFabricMeters?: number;
+  estimatedReplacementMeters?: number;
+}
+
+export type DetailedResultStatus = 'Pass' | 'Fail' | 'N/A';
+
+export interface DetailedResultItem {
+  result?: DetailedResultStatus;
+  remarks?: string;
+}
+
+export type DetailedResults = Record<string, DetailedResultItem>;
 
 export interface User {
   id: string;
@@ -81,10 +131,17 @@ export interface ActivityLog {
 export interface Inspection {
   id: string;
   version: number;
+  certificateRef?: string;
+  referenceNumber?: string;
   customerName: string;
+  supplierName?: string;
   orderNumber: string;
   styleRef: string;
   fabricType: string;
+  fabricConstruction?: FabricConstruction;
+  representativeFabricImageUrl?: string;
+  quantitySummary?: QuantitySummary;
+  detailedResults?: DetailedResults;
   color: string;
   gsm: number;
   composition: string;
