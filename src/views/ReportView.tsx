@@ -25,6 +25,8 @@ import { format } from 'date-fns';
 import {
   cn,
   calculateFourPointStats,
+  calculateRollLengthMeters,
+  calculateRollWeightKg,
   generateCertificateRef,
   getCertificateRef,
   getDefaultFabricConstruction,
@@ -394,7 +396,35 @@ export const ReportView = () => {
     setEditDraft((draft) => draft ? {
       ...draft,
       rolls: draft.rolls.map((roll) =>
-        roll.id === rollId ? { ...roll, ...updates } : roll
+        roll.id === rollId
+          ? (() => {
+              const nextRoll = { ...roll, ...updates };
+              const gsm = Number(draft.gsm || 0);
+              const width = Number(nextRoll.widthInches || 0);
+
+              if ('weightKg' in updates && updates.weightKg !== undefined) {
+                const calculatedLength = calculateRollLengthMeters(
+                  gsm,
+                  width,
+                  Number(updates.weightKg)
+                );
+                if (calculatedLength !== undefined) {
+                  nextRoll.lengthYards = calculatedLength;
+                }
+              } else if ('lengthYards' in updates || 'widthInches' in updates) {
+                const calculatedWeight = calculateRollWeightKg(
+                  gsm,
+                  width,
+                  Number(nextRoll.lengthYards || 0)
+                );
+                if (calculatedWeight !== undefined) {
+                  nextRoll.weightKg = calculatedWeight;
+                }
+              }
+
+              return nextRoll;
+            })()
+          : roll
       ),
     } : draft);
   };

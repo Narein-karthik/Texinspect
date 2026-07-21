@@ -173,8 +173,10 @@ export interface InspectionStore {
   inspections: Inspection[];
   syncQueue: SyncQueueItem[];
   currentUser: User | null;
+  photoEvidenceEnabled: boolean;
   setCurrentUser: (user: User | null) => void;
   setInspections: (inspections: Inspection[]) => void;
+  setPhotoEvidenceEnabled: (enabled: boolean) => void;
   addInspection: (inspection: Inspection) => void;
   updateInspection: (id: string, updates: Partial<Inspection>) => void;
   deleteInspection: (id: string) => void;

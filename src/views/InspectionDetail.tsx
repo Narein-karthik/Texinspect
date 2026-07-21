@@ -14,7 +14,13 @@ import { motion, AnimatePresence } from 'motion/react';
 import { DefectTimeline } from '../components/DefectTimeline';
 import { SpeechToTextButton } from '../components/SpeechToTextButton';
 import { DEFECT_TYPES } from '../constants';
-import { calculateFourPointStats, getPassFailStatus, cn } from '../lib/utils';
+import {
+  calculateFourPointStats,
+  calculateRollLengthMeters,
+  calculateRollWeightKg,
+  getPassFailStatus,
+  cn
+} from '../lib/utils';
 
 export const InspectionDetail = () => {
   const { id } = useParams<{ id: string }>();
@@ -22,6 +28,8 @@ export const InspectionDetail = () => {
 
   const inspections = useStore((state) => state.inspections);
   const updateInspection = useStore((state) => state.updateInspection);
+  const photoEvidenceEnabled = useStore((state) => state.photoEvidenceEnabled);
+  const setPhotoEvidenceEnabled = useStore((state) => state.setPhotoEvidenceEnabled);
 
   const inspection = inspections.find((i) => i.id === id);
 
@@ -31,6 +39,37 @@ export const InspectionDetail = () => {
 
   const [defectComment, setDefectComment] = useState('');
   const [defectPhoto, setDefectPhoto] = useState<string | null>(null);
+  const [addRollDraft, setAddRollDraft] = useState({
+    lengthYards: '',
+    widthInches: '',
+    weightKg: '',
+  });
+
+  const updateAddRollMeasure = (
+    field: 'lengthYards' | 'widthInches' | 'weightKg',
+    value: string
+  ) => {
+    setAddRollDraft((draft) => {
+      const next = { ...draft, [field]: value };
+      const gsm = Number(inspection?.gsm || 0);
+      const width = Number(next.widthInches);
+      const length = Number(next.lengthYards);
+      const weight = Number(next.weightKg);
+
+      if (field === 'weightKg') {
+        const calculatedLength = calculateRollLengthMeters(gsm, width, weight);
+        next.lengthYards = calculatedLength ? String(calculatedLength) : '';
+      } else if (field === 'lengthYards' || (field === 'widthInches' && next.lengthYards)) {
+        const calculatedWeight = calculateRollWeightKg(gsm, width, length);
+        next.weightKg = calculatedWeight ? String(calculatedWeight) : '';
+      } else if (field === 'widthInches' && next.weightKg) {
+        const calculatedLength = calculateRollLengthMeters(gsm, width, weight);
+        next.lengthYards = calculatedLength ? String(calculatedLength) : '';
+      }
+
+      return next;
+    });
+  };
 
   useEffect(() => {
     if (inspection && inspection.rolls.length > 0 && !activeRollId) {
@@ -50,6 +89,14 @@ export const InspectionDetail = () => {
 
   const handleUpdate = (updates: Partial<typeof inspection>) => {
     if (id) updateInspection(id, updates);
+  };
+
+  const handlePhotoEvidenceToggle = (enabled: boolean) => {
+    setPhotoEvidenceEnabled(enabled);
+
+    if (!enabled) {
+      setDefectPhoto(null);
+    }
   };
 
   const handleManualVerdict = (isPass: boolean) => {
@@ -107,6 +154,7 @@ export const InspectionDetail = () => {
 
     setActiveRollId(newRoll.id);
     setShowAddRoll(false);
+    setAddRollDraft({ lengthYards: '', widthInches: '', weightKg: '' });
   };
 
   const addDefect = (e: React.FormEvent<HTMLFormElement>) => {
@@ -114,7 +162,7 @@ export const InspectionDetail = () => {
 
     if (!showAddDefect) return;
 
-    if (!defectPhoto) {
+    if (photoEvidenceEnabled && !defectPhoto) {
       alert('Please attach defect evidence photo');
       return;
     }
@@ -127,7 +175,7 @@ export const InspectionDetail = () => {
       type: fd.get('type') as DefectType,
       severity: Number(fd.get('severity')) as 1 | 2 | 3 | 4,
       comment: defectComment || '',
-      photoUrl: defectPhoto || '',
+      photoUrl: photoEvidenceEnabled ? defectPhoto || '' : '',
       timestamp: new Date().toISOString(),
     };
 
@@ -484,6 +532,8 @@ export const InspectionDetail = () => {
                       min="0"
                       step="0.01"
                       placeholder="125"
+                      value={addRollDraft.lengthYards}
+                      onChange={(event) => updateAddRollMeasure('lengthYards', event.target.value)}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -500,6 +550,8 @@ export const InspectionDetail = () => {
                       min="0"
                       step="0.01"
                       placeholder="58"
+                      value={addRollDraft.widthInches}
+                      onChange={(event) => updateAddRollMeasure('widthInches', event.target.value)}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -517,6 +569,8 @@ export const InspectionDetail = () => {
                       min="0"
                       step="0.01"
                       placeholder="Optional"
+                      value={addRollDraft.weightKg}
+                      onChange={(event) => updateAddRollMeasure('weightKg', event.target.value)}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -660,8 +714,39 @@ export const InspectionDetail = () => {
                   </div>
                 </div>
 
+                {/* photo preference */}
+                <div className="flex items-center justify-between gap-4 rounded-2xl bg-gray-50 px-4 py-3 border border-gray-100">
+                  <div>
+                    <div className="text-xs font-black uppercase tracking-widest text-gray-700">
+                      Photo Evidence
+                    </div>
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-gray-400">
+                      {photoEvidenceEnabled ? 'Required for this defect' : 'No image needed'}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={photoEvidenceEnabled}
+                    aria-label="Photo Evidence"
+                    onClick={() => handlePhotoEvidenceToggle(!photoEvidenceEnabled)}
+                    className={cn(
+                      "relative h-7 w-12 rounded-full p-1 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2",
+                      photoEvidenceEnabled ? "bg-blue-600" : "bg-gray-300"
+                    )}
+                  >
+                    <span
+                      className={cn(
+                        "block h-5 w-5 rounded-full bg-white shadow-sm transition-transform",
+                        photoEvidenceEnabled ? "translate-x-5" : "translate-x-0"
+                      )}
+                    />
+                  </button>
+                </div>
+
                 {/* photo */}
-                {!defectPhoto ? (
+                {photoEvidenceEnabled && (!defectPhoto ? (
                   <label className="block cursor-pointer">
                     <input
                       type="file"
@@ -733,7 +818,7 @@ export const InspectionDetail = () => {
                       Retake
                     </button>
                   </div>
-                )}
+                ))}
 
                 {/* comment */}
                 <div className="flex gap-2">

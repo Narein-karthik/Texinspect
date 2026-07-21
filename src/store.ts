@@ -23,8 +23,10 @@ export const useStore = create<InspectionStore>()(
       inspections: [],
       syncQueue: [],
       currentUser: null,
+      photoEvidenceEnabled: false,
       setCurrentUser: (user: User | null) => set({ currentUser: user }),
       setInspections: (inspections: Inspection[]) => set({ inspections }),
+      setPhotoEvidenceEnabled: (enabled: boolean) => set({ photoEvidenceEnabled: enabled }),
       addInspection: async (inspection) => {
         set((state) => ({ 
           inspections: [inspection, ...state.inspections] 

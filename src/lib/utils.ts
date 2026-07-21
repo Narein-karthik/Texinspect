@@ -25,6 +25,30 @@ export function getPassFailStatus(points: number, threshold: number = 40) {
   return points <= threshold ? "PASS" : "FAIL";
 }
 
+function roundToTwo(value: number) {
+  return Number(value.toFixed(2));
+}
+
+export function calculateRollWeightKg(
+  gsm: number,
+  widthInches: number,
+  lengthMeters: number
+) {
+  const widthMeters = widthInches * 0.0254;
+  if (gsm <= 0 || widthMeters <= 0 || lengthMeters <= 0) return undefined;
+  return roundToTwo((gsm * widthMeters * lengthMeters) / 1000);
+}
+
+export function calculateRollLengthMeters(
+  gsm: number,
+  widthInches: number,
+  weightKg: number
+) {
+  const widthMeters = widthInches * 0.0254;
+  if (gsm <= 0 || widthMeters <= 0 || weightKg <= 0) return undefined;
+  return roundToTwo((weightKg * 1000) / (gsm * widthMeters));
+}
+
 function firstThreeClean(value?: string) {
   const cleaned = (value || '')
     .replace(/[^a-zA-Z0-9]/g, '')
