@@ -16,6 +16,7 @@ import { cn } from '../lib/utils';
 import { useStore } from '../store';
 import { signInWithGoogle } from '../lib/firebase';
 import { StatusBar } from './StatusBar';
+import { PublicSite } from '../views/PublicSite';
 
 type DisplayMode = 'mobile' | 'desktop';
 const DISPLAY_MODE_KEY = 'tex-inspect-display-mode';
@@ -249,7 +250,7 @@ export const Layout: React.FC<{ children: React.ReactNode }> = ({ children }) =>
   };
 
   if (!currentUser) {
-    return <LoginScreen />;
+    return location.pathname === '/login' ? <LoginScreen /> : <PublicSite />;
   }
 
   const navItems = currentUser.role === 'ADMIN'
