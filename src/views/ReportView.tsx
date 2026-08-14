@@ -27,6 +27,7 @@ import {
   calculateFourPointStats,
   calculateRollLengthMeters,
   calculateRollWeightKg,
+  compressEvidenceImage,
   generateCertificateRef,
   getCertificateRef,
   getDefaultFabricConstruction,
@@ -456,27 +457,16 @@ export const ReportView = () => {
   ) => {
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onloadend = () => {
-      const image = new Image();
-      image.onload = () => {
-        const canvas = document.createElement('canvas');
-        const maxWidth = 800;
-        const scale = Math.min(1, maxWidth / image.width);
-        canvas.width = Math.round(image.width * scale);
-        canvas.height = Math.round(image.height * scale);
-
-        const context = canvas.getContext('2d');
-        if (!context) return;
-
-        context.drawImage(image, 0, 0, canvas.width, canvas.height);
+    compressEvidenceImage(file)
+      .then((photoUrl) => {
         updateDraftDefect(rollId, defectId, {
-          photoUrl: canvas.toDataURL('image/jpeg', 0.65),
+          photoUrl,
         });
-      };
-      image.src = reader.result as string;
-    };
-    reader.readAsDataURL(file);
+      })
+      .catch((error) => {
+        console.error('Unable to process defect evidence photo', error);
+        alert('Unable to process this image. Please try again.');
+      });
   };
 
   const replaceRepresentativeFabricImage = (file?: File) => {
@@ -2071,10 +2061,10 @@ export const ReportView = () => {
                 >
                   <img
                     src={defect.photoUrl}
-                    className="w-full h-72 object-cover"
+                    className="w-full h-72 object-contain bg-gray-100"
+                    style={{ filter: 'brightness(1.12) contrast(1.06)' }}
                     alt={`Defect on Roll ${defect.rollNumber}`}
                     loading="lazy"
-                    crossOrigin="anonymous"
                   />
                   <div className="p-4 bg-gray-50">
                     <div className="flex items-start justify-between gap-2">

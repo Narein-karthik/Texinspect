@@ -18,6 +18,7 @@ import {
   calculateFourPointStats,
   calculateRollLengthMeters,
   calculateRollWeightKg,
+  compressEvidenceImage,
   getPassFailStatus,
   cn
 } from '../lib/utils';
@@ -753,10 +754,19 @@ export const InspectionDetail = () => {
                       accept="image/*"
                       capture="environment"
                       className="hidden"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         const file = e.target.files?.[0];
 
                         if (file) {
+                          try {
+                            setDefectPhoto(await compressEvidenceImage(file));
+                          } catch (error) {
+                            console.error('Unable to process defect evidence photo', error);
+                            alert('Unable to process this image. Please try again.');
+                          }
+                          return;
+                          /*
+
                           const reader = new FileReader();
 
                           reader.onloadend = () => {
@@ -791,6 +801,7 @@ export const InspectionDetail = () => {
                           };
 
                           reader.readAsDataURL(file);
+                          */
                         }
                       }}
                     />
@@ -807,7 +818,7 @@ export const InspectionDetail = () => {
                   <div className="relative overflow-hidden rounded-[2rem]">
                     <img
                       src={defectPhoto}
-                      className="w-full aspect-video object-cover"
+                      className="w-full max-h-80 object-contain bg-gray-100"
                     />
 
                     <button
