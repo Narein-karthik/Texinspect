@@ -179,7 +179,7 @@ export interface InspectionStore {
   setPhotoEvidenceEnabled: (enabled: boolean) => void;
   addInspection: (inspection: Inspection) => void;
   updateInspection: (id: string, updates: Partial<Inspection>) => void;
-  deleteInspection: (id: string) => void;
+  deleteInspection: (id: string) => Promise<void>;
   addToSyncQueue: (item: SyncQueueItem) => void;
   removeFromSyncQueue: (id: string) => void;
 }

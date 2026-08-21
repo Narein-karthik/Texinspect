@@ -60,10 +60,20 @@ export const useStore = create<InspectionStore>()(
           }
         }
       },
-      deleteInspection: (id) =>
+      deleteInspection: async (id) => {
+        if (getStore().currentUser?.role !== 'ADMIN') {
+          throw new Error('Only administrators can delete reports.');
+        }
+
+        if (!navigator.onLine) {
+          throw new Error('Connect to the internet before deleting a report.');
+        }
+
+        await inspectionService.deleteInspection(id);
         set((state) => ({
           inspections: state.inspections.filter((i) => i.id !== id),
-        })),
+        }));
+      },
       addToSyncQueue: (item) =>
         set((state) => ({
           syncQueue: [...state.syncQueue, item]

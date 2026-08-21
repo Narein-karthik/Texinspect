@@ -117,6 +117,17 @@ export const inspectionService = {
     }
   },
 
+  async deleteInspection(id: string) {
+
+    const path = `${INSPECTIONS_COLLECTION}/${id}`;
+
+    try {
+      await deleteDoc(doc(db, INSPECTIONS_COLLECTION, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
   async getInspection(id: string) {
 
     const path = `${INSPECTIONS_COLLECTION}/${id}`;

@@ -70,7 +70,7 @@ service cloud.firestore {
         && incoming().id == existing().id
         && incoming().inspectorId == existing().inspectorId; // Identity lock
 
-      allow delete: if false; // Deletion not allowed via mobile terminal for audit trail
+      allow delete: if isAdmin();
     }
 
     // User Profiles

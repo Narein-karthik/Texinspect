@@ -1,19 +1,23 @@
 import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
-import { FileText, ArrowRight, Download, Search, SlidersHorizontal, X } from 'lucide-react';
+import { FileText, ArrowRight, Download, Search, SlidersHorizontal, Trash2, X } from 'lucide-react';
 import { format } from 'date-fns';
+import { Inspection } from '../types';
 
 export const ReportsView = () => {
   const navigate = useNavigate();
 
   const inspections = useStore((state) => state.inspections);
   const currentUser = useStore((state) => state.currentUser);
+  const deleteInspection = useStore((state) => state.deleteInspection);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedInspector, setSelectedInspector] = useState('');
   const [selectedCustomer, setSelectedCustomer] = useState('');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [reportToDelete, setReportToDelete] = useState<Inspection | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const inspectors = useMemo(
     () => Array.from(new Set(inspections.map((inspection) => inspection.inspectorName).filter(Boolean))).sort(),
@@ -58,6 +62,22 @@ export const ReportsView = () => {
     setSelectedCustomer('');
     setStartDate('');
     setEndDate('');
+  };
+
+  const confirmDelete = async () => {
+    if (!reportToDelete) return;
+
+    setIsDeleting(true);
+
+    try {
+      await deleteInspection(reportToDelete.id);
+      setReportToDelete(null);
+    } catch (error) {
+      console.error('Unable to delete report', error);
+      alert(error instanceof Error ? error.message : 'Unable to delete this report. Please try again.');
+    } finally {
+      setIsDeleting(false);
+    }
   };
 
   return (
@@ -188,51 +208,116 @@ export const ReportsView = () => {
       ) : (
         <div className="space-y-4">
           {filteredInspections.map((inspection) => (
-            <button
+            <article
               key={inspection.id}
-              onClick={() => navigate(`/reports/${inspection.id}`)}
-              className="w-full bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex items-center justify-between hover:border-blue-500 transition-all"
+              className="w-full bg-white rounded-3xl p-5 shadow-sm border border-gray-100 flex items-center gap-3 hover:border-blue-500 transition-all"
             >
-              <div className="text-left">
-                <h2 className="font-black text-lg text-gray-900 uppercase">
-                  {inspection.customerName}
-                </h2>
+              <button
+                type="button"
+                onClick={() => navigate(`/reports/${inspection.id}`)}
+                className="min-w-0 flex flex-1 items-center justify-between gap-4 text-left"
+              >
+                <div className="min-w-0">
+                  <h2 className="truncate font-black text-lg text-gray-900 uppercase">
+                    {inspection.customerName}
+                  </h2>
 
-                <p className="text-sm text-gray-500 mt-1">
-                  {format(
-                    new Date(inspection.inspectionDate),
-                    'PPP'
+                  <p className="text-sm text-gray-500 mt-1">
+                    {format(
+                      new Date(inspection.inspectionDate),
+                      'PPP'
+                    )}
+                  </p>
+
+                  <div className="mt-2 text-xs text-gray-400 uppercase tracking-wider">
+                    Inspector: {inspection.inspectorName}
+                  </div>
+
+                  <div className="mt-1 text-xs text-gray-400 uppercase tracking-wider">
+                    Style: {inspection.styleRef || 'N/A'} / Order: {inspection.orderNumber || 'N/A'}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 items-center gap-3">
+                  <div
+                    className={`px-4 py-2 rounded-full text-xs font-black ${
+                      inspection.isPass
+                        ? 'bg-green-100 text-green-700'
+                        : 'bg-red-100 text-red-700'
+                    }`}
+                  >
+                    {inspection.isPass ? 'PASS' : 'FAIL'}
+                  </div>
+
+                  {currentUser?.role === 'ADMIN' ? (
+                    <Download className="text-gray-400" />
+                  ) : (
+                    <ArrowRight className="text-gray-400" />
                   )}
-                </p>
-
-                <div className="mt-2 text-xs text-gray-400 uppercase tracking-wider">
-                  Inspector: {inspection.inspectorName}
                 </div>
+              </button>
 
-                <div className="mt-1 text-xs text-gray-400 uppercase tracking-wider">
-                  Style: {inspection.styleRef || 'N/A'} / Order: {inspection.orderNumber || 'N/A'}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-3">
-                <div
-                  className={`px-4 py-2 rounded-full text-xs font-black ${
-                    inspection.isPass
-                      ? 'bg-green-100 text-green-700'
-                      : 'bg-red-100 text-red-700'
-                  }`}
+              {currentUser?.role === 'ADMIN' && (
+                <button
+                  type="button"
+                  onClick={() => setReportToDelete(inspection)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-red-100 bg-red-50 text-red-600 transition-colors hover:border-red-300 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-500"
+                  aria-label={`Delete report for ${inspection.customerName}`}
+                  title="Delete report"
                 >
-                  {inspection.isPass ? 'PASS' : 'FAIL'}
-                </div>
-
-                {currentUser?.role === 'ADMIN' ? (
-                  <Download className="text-gray-400" />
-                ) : (
-                  <ArrowRight className="text-gray-400" />
-                )}
-              </div>
-            </button>
+                  <Trash2 size={17} />
+                </button>
+              )}
+            </article>
           ))}
+        </div>
+      )}
+
+      {reportToDelete && (
+        <div className="fixed inset-0 z-[120] flex items-end justify-center p-4 sm:items-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/45 backdrop-blur-sm"
+            aria-label="Close delete confirmation"
+            onClick={() => !isDeleting && setReportToDelete(null)}
+          />
+
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="delete-report-title"
+            className="relative w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl"
+          >
+            <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-red-50 text-red-600">
+              <Trash2 size={21} />
+            </div>
+
+            <h2 id="delete-report-title" className="mt-4 text-lg font-black text-gray-900">
+              Delete this report?
+            </h2>
+            <p className="mt-2 text-sm leading-6 text-gray-500">
+              This permanently removes the report for {reportToDelete.customerName}. It cannot be restored.
+            </p>
+
+            <div className="mt-6 grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setReportToDelete(null)}
+                className="h-11 rounded-xl border border-gray-200 bg-white text-sm font-bold text-gray-600 hover:bg-gray-50 disabled:opacity-50"
+              >
+                Keep report
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => void confirmDelete()}
+                className="h-11 rounded-xl bg-red-600 text-sm font-bold text-white hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {isDeleting ? 'Deleting...' : 'Delete report'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
