@@ -127,9 +127,27 @@ export const ReportView = () => {
         return;
       }
 
-      const styles = Array.from(document.querySelectorAll('style, link[rel="stylesheet"]'))
+      const inlineStyles = Array.from(document.querySelectorAll('style'))
         .map((node) => node.outerHTML)
         .join('\n');
+      const stylesheetLinks = Array.from(
+        document.querySelectorAll<HTMLLinkElement>('link[rel="stylesheet"]')
+      );
+      const stylesheetContent = await Promise.all(
+        stylesheetLinks.map(async (link) => {
+          try {
+            const response = await fetch(link.href);
+            if (!response.ok) throw new Error(`Unable to load ${link.href}`);
+            return `<style>${await response.text()}</style>`;
+          } catch (error) {
+            console.warn('Unable to inline print stylesheet', error);
+            return link.outerHTML;
+          }
+        })
+      );
+      const printReady = new Promise<void>((resolve) => {
+        printWindow.addEventListener('load', () => resolve(), { once: true });
+      });
 
       printWindow.document.open();
       printWindow.document.write(`
@@ -137,7 +155,9 @@ export const ReportView = () => {
         <html>
           <head>
             <title>TexInspect Report</title>
-            ${styles}
+            <base href="${window.location.origin}/">
+            ${inlineStyles}
+            ${stylesheetContent.join('\n')}
             <style>
               html, body, #root {
                 height: auto !important;
@@ -190,11 +210,18 @@ export const ReportView = () => {
       `);
       printWindow.document.close();
 
-      window.setTimeout(() => {
-        printWindow.focus();
-        printWindow.print();
-        printWindow.close();
-      }, 500);
+      await Promise.race([
+        printReady,
+        new Promise<void>((resolve) => window.setTimeout(resolve, 1500)),
+      ]);
+      await printWindow.document.fonts?.ready;
+      await Promise.all(
+        Array.from(printWindow.document.images).map((image) => image.decode().catch(() => undefined))
+      );
+
+      printWindow.focus();
+      printWindow.print();
+      printWindow.close();
     } finally {
       window.setTimeout(() => setIsPrinting(false), 800);
     }
@@ -211,11 +238,7 @@ export const ReportView = () => {
     }
   );
   const visibleConstructionFields = constructionFieldsByType[inspection.fabricType] || [];
-  const representativeImage =
-    inspection.representativeFabricImageUrl ||
-    inspection.rolls
-      .flatMap((roll) => roll.defects)
-      .find((defect) => defect.photoUrl)?.photoUrl;
+  const representativeImage = inspection.representativeFabricImageUrl?.trim();
   const quantitySummary = inspection.quantitySummary || {};
   const quantityUom = quantitySummary.uom === 'Others'
     ? quantitySummary.customUom?.trim() || 'Others'
@@ -1366,18 +1389,14 @@ export const ReportView = () => {
               </div>
             </div>
 
-            <div className="space-y-3">
-              <h2 className="text-[10px] font-black uppercase tracking-[0.35em] text-gray-900">Representative Fabric Image</h2>
-              <div className="aspect-[4/3] overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
-                {representativeImage ? (
+            {representativeImage && (
+              <div className="space-y-3">
+                <h2 className="text-[10px] font-black uppercase tracking-[0.35em] text-gray-900">Representative Fabric Image</h2>
+                <div className="aspect-[4/3] overflow-hidden rounded-2xl border border-gray-200 bg-gray-100">
                   <img src={representativeImage} alt="Representative fabric" className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full items-center justify-center p-6 text-center text-xs font-black uppercase tracking-widest text-gray-300">
-                    No Image Available
-                  </div>
-                )}
+                </div>
               </div>
-            </div>
+            )}
           </section>
 
           <section className="grid gap-4 md:grid-cols-[0.9fr_1.1fr]">
