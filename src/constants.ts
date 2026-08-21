@@ -36,3 +36,18 @@ export const DEFECT_TYPES = [
   "Double Yarn",
   "Other"
 ];
+
+export const DETAILED_RESULT_CHECKPOINTS = [
+  'Color Conformity',
+  'Face to Face / Edge to Edge',
+  'Roll to Roll Variation',
+  'Width',
+  'Bow / Skew',
+  'GSM',
+  'Roll Length',
+  'Joint Pieces',
+  'Handfeel',
+  'General Conformity',
+] as const;
+
+export const DETAILED_RESULT_OPTIONS = ['Pass', 'Fail', 'N/A'] as const;

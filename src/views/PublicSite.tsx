@@ -13,17 +13,16 @@ import {
   X,
 } from 'lucide-react';
 import heroImage from '../assets/texinspect-hero.png';
-import { submitContactRequest } from '../services/contactService';
 
-const Brand = ({ onClick }: { onClick?: () => void }) => (
+const Brand = ({ onClick, light = false }: { onClick?: () => void; light?: boolean }) => (
   <button
     type="button"
     onClick={onClick || (() => window.scrollTo({ top: 0, behavior: 'smooth' }))}
     className="flex items-center gap-2 text-left"
     aria-label="TEXINSPECT home"
   >
-    <span className="flex h-9 w-9 items-center justify-center rounded-lg bg-[#0b1930] text-sm font-black text-white">TX</span>
-    <span className="text-lg font-black tracking-[0.02em] text-[#0b1930]">TEXINSPECT</span>
+    <span className={light ? 'flex h-9 w-9 items-center justify-center rounded-lg border border-white/25 bg-white/15 text-sm font-black text-white' : 'flex h-9 w-9 items-center justify-center rounded-lg bg-[#0b1930] text-sm font-black text-white'}>TX</span>
+    <span className={light ? 'text-lg font-black tracking-[0.02em] text-white' : 'text-lg font-black tracking-[0.02em] text-[#0b1930]'}>TEXINSPECT</span>
   </button>
 );
 
@@ -65,22 +64,22 @@ const PublicHeader = ({ onContact, onSignIn }: { onContact: () => void; onSignIn
   };
 
   return (
-    <header className="absolute inset-x-0 top-0 z-20">
+    <header className="absolute inset-x-0 top-0 z-20 border-b border-white/10 bg-[#071426]/35 backdrop-blur-md">
       <div className="mx-auto flex max-w-7xl items-center justify-between px-5 py-5 sm:px-8">
-        <Brand />
-        <nav className="hidden items-center gap-7 text-sm font-semibold text-slate-600 md:flex">
-          <button type="button" onClick={() => scrollTo('product')} className="hover:text-[#0b1930]">Product</button>
-          <button type="button" onClick={() => scrollTo('workflow')} className="hover:text-[#0b1930]">How it works</button>
-          <button type="button" onClick={onContact} className="hover:text-[#0b1930]">Contact</button>
+        <Brand light />
+        <nav className="hidden items-center gap-7 text-sm font-semibold text-white/70 md:flex">
+          <button type="button" onClick={() => scrollTo('product')} className="transition-colors hover:text-white">Product</button>
+          <button type="button" onClick={() => scrollTo('workflow')} className="transition-colors hover:text-white">How it works</button>
+          <button type="button" onClick={onContact} className="transition-colors hover:text-white">Contact</button>
         </nav>
         <div className="hidden items-center gap-3 md:flex">
-          <button type="button" onClick={onSignIn} className="px-3 py-2 text-sm font-bold text-[#0b1930] hover:text-blue-700">Sign in</button>
-          <button type="button" onClick={onContact} className="rounded-lg bg-[#0b1930] px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:bg-[#162b4e]">Talk to us</button>
+          <button type="button" onClick={onSignIn} className="px-3 py-2 text-sm font-bold text-white/85 transition-colors hover:text-white">Sign in</button>
+          <button type="button" onClick={onContact} className="rounded-lg bg-[#3b91f6] px-4 py-2.5 text-sm font-bold text-white shadow-lg shadow-blue-950/30 transition-colors hover:bg-[#2c7be5]">Talk to us</button>
         </div>
         <button
           type="button"
           onClick={() => setMenuOpen((open) => !open)}
-          className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-[#0b1930] md:hidden"
+          className="flex h-10 w-10 items-center justify-center rounded-lg border border-white/20 bg-white/10 text-white md:hidden"
           aria-label={menuOpen ? 'Close menu' : 'Open menu'}
         >
           {menuOpen ? <X size={20} /> : <Menu size={20} />}
@@ -213,21 +212,61 @@ const ContactPage = ({ onHome, onSignIn }: { onHome: () => void; onSignIn: () =>
   const [submitted, setSubmitted] = React.useState(false);
   const [submissionError, setSubmissionError] = React.useState('');
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [formValues, setFormValues] = React.useState({
+    name: '',
+    email: '',
+    company: '',
+    improvement: '',
+    website: '',
+  });
+
+  const updateField = (field: keyof typeof formValues, value: string) => {
+    setFormValues((currentValues) => ({ ...currentValues, [field]: value }));
+  };
+
+  const isValidEmail = (email: string) => /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email);
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (isSubmitting) return;
+
+    const name = formValues.name.trim();
+    const email = formValues.email.trim().toLowerCase();
+    const company = formValues.company.trim();
+    const improvement = formValues.improvement.trim();
     setSubmissionError('');
+
+    if (!name || !email || !company || !improvement) {
+      setSubmissionError('Please complete all fields before requesting a walkthrough.');
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      setSubmissionError('Please enter a valid work email address.');
+      return;
+    }
+
     setIsSubmitting(true);
 
-    const formData = new FormData(event.currentTarget);
-
     try {
-      await submitContactRequest({
-        name: String(formData.get('name') || '').trim(),
-        email: String(formData.get('email') || '').trim(),
-        company: String(formData.get('company') || '').trim(),
-        message: String(formData.get('message') || '').trim(),
+      const apiResponse = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name,
+          email,
+          company,
+          improvement,
+          website: formValues.website,
+        }),
       });
+
+      const apiResult = await apiResponse.json().catch(() => null);
+      if (!apiResponse.ok || apiResult?.success !== true) {
+        throw new Error('Walkthrough request was rejected.');
+      }
+
+      setFormValues({ name: '', email: '', company: '', improvement: '', website: '' });
       setSubmitted(true);
     } catch (error) {
       console.error('Unable to submit contact request', error);
@@ -262,19 +301,20 @@ const ContactPage = ({ onHome, onSignIn }: { onHome: () => void; onSignIn: () =>
           {submitted ? (
             <div className="py-12 text-center">
               <CheckCircle2 className="mx-auto text-emerald-600" size={42} />
-              <h2 className="mt-5 text-2xl font-black">Thank you for your interest.</h2>
+              <h2 className="mt-5 text-2xl font-black" aria-live="polite">Thanks! We&apos;ve received your request.</h2>
               <p className="mx-auto mt-3 max-w-sm text-sm leading-6 text-slate-600">Your message is ready for the TEXINSPECT team. We’ll be in touch with the next steps.</p>
               <button type="button" onClick={onHome} className="mt-7 rounded-lg bg-[#0b1930] px-5 py-3 text-sm font-bold text-white">Back to home</button>
             </div>
           ) : (
             <form onSubmit={handleSubmit} className="space-y-5">
               <div><h2 className="text-xl font-black">Request a walkthrough</h2><p className="mt-1 text-sm text-slate-500">We’ll start with your current process.</p></div>
-              <label className="block text-sm font-bold text-slate-700">Name<input required name="name" autoComplete="name" className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
-              <label className="block text-sm font-bold text-slate-700">Work email<input required type="email" name="email" autoComplete="email" className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
-              <label className="block text-sm font-bold text-slate-700">Company<input required name="company" autoComplete="organization" className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
-              <label className="block text-sm font-bold text-slate-700">What would you like to improve?<textarea required name="message" rows={4} className="mt-2 w-full resize-y rounded-lg border border-slate-200 p-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
-              {submissionError && <p role="alert" className="text-sm font-medium text-red-600">{submissionError}</p>}
-              <button type="submit" disabled={isSubmitting} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#2c7be5] px-5 text-sm font-bold text-white transition-colors hover:bg-[#1765cb] disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? 'Sending inquiry...' : <>Send inquiry <ArrowRight size={17} /></>}</button>
+              <label className="block text-sm font-bold text-slate-700">Name<input required name="name" value={formValues.name} onChange={(event) => updateField('name', event.target.value)} autoComplete="name" className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+              <label className="block text-sm font-bold text-slate-700">Work email<input required type="email" name="email" value={formValues.email} onChange={(event) => updateField('email', event.target.value)} autoComplete="email" className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+              <label className="block text-sm font-bold text-slate-700">Company<input required name="company" value={formValues.company} onChange={(event) => updateField('company', event.target.value)} autoComplete="organization" className="mt-2 h-11 w-full rounded-lg border border-slate-200 px-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+              <label className="block text-sm font-bold text-slate-700">What would you like TexInspect to help improve?<textarea required name="improvement" value={formValues.improvement} onChange={(event) => updateField('improvement', event.target.value)} rows={4} className="mt-2 w-full resize-y rounded-lg border border-slate-200 p-3 font-normal outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" /></label>
+              <label className="absolute left-[-10000px] h-px w-px overflow-hidden" aria-hidden="true">Website<input tabIndex={-1} autoComplete="off" name="website" value={formValues.website} onChange={(event) => updateField('website', event.target.value)} /></label>
+              <div aria-live="assertive">{submissionError && <p role="alert" className="text-sm font-medium text-red-600">{submissionError}</p>}</div>
+              <button type="submit" disabled={isSubmitting} className="inline-flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-[#2c7be5] px-5 text-sm font-bold text-white transition-colors hover:bg-[#1765cb] disabled:cursor-not-allowed disabled:opacity-60">{isSubmitting ? 'Sending...' : <>Request walkthrough <ArrowRight size={17} /></>}</button>
             </form>
           )}
         </section>

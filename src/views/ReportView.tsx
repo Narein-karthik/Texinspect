@@ -33,8 +33,8 @@ import {
   getDefaultFabricConstruction,
   getPassFailStatus,
 } from '../lib/utils';
-import { DEFECT_TYPES } from '../constants';
-import { DefectType, DetailedResultStatus, FabricConstruction, Inspection } from '../types';
+import { DEFECT_TYPES, DETAILED_RESULT_CHECKPOINTS } from '../constants';
+import { DefectType, FabricConstruction, Inspection } from '../types';
 
 const constructionFieldsByType: Record<string, Array<{ name: keyof FabricConstruction; label: string; type?: string }>> = {
   Woven: [
@@ -63,20 +63,6 @@ const constructionFieldsByType: Record<string, Array<{ name: keyof FabricConstru
   ],
 };
 
-const detailedResultCheckpoints = [
-  'Color Conformity',
-  'Face to Face / Edge to Edge',
-  'Roll to Roll Variation',
-  'Width',
-  'Bow / Skew',
-  'GSM',
-  'Roll Length',
-  'Joint Pieces',
-  'Handfeel',
-  'General Conformity',
-];
-
-const detailedResultOptions: DetailedResultStatus[] = ['Pass', 'Fail', 'N/A'];
 const quantityUomOptions: Array<NonNullable<NonNullable<Inspection['quantitySummary']>['uom']>> = [
   'Meters',
   'Kgs',
@@ -368,7 +354,7 @@ export const ReportView = () => {
         : 'To be confirmed by customer',
     },
   ];
-  const detailedResults = detailedResultCheckpoints.map((checkpoint) => ({
+  const detailedResults = DETAILED_RESULT_CHECKPOINTS.map((checkpoint) => ({
     checkpoint,
     result: inspection.detailedResults?.[checkpoint]?.result || 'N/A',
     remarks: inspection.detailedResults?.[checkpoint]?.remarks || '',
@@ -402,6 +388,35 @@ export const ReportView = () => {
               const nextRoll = { ...roll, ...updates };
               const gsm = Number(draft.gsm || 0);
               const width = Number(nextRoll.widthInches || 0);
+              const uom = draft.quantitySummary?.uom;
+
+              if (uom === 'Kgs') {
+                if ('weightKg' in updates || 'widthInches' in updates) {
+                  const calculatedLength = calculateRollLengthMeters(
+                    gsm,
+                    width,
+                    Number(nextRoll.weightKg || 0)
+                  );
+                  if (calculatedLength !== undefined) {
+                    nextRoll.lengthYards = calculatedLength;
+                  }
+                }
+                return nextRoll;
+              }
+
+              if (uom === 'Meters') {
+                if ('lengthYards' in updates || 'widthInches' in updates) {
+                  const calculatedWeight = calculateRollWeightKg(
+                    gsm,
+                    width,
+                    Number(nextRoll.lengthYards || 0)
+                  );
+                  if (calculatedWeight !== undefined) {
+                    nextRoll.weightKg = calculatedWeight;
+                  }
+                }
+                return nextRoll;
+              }
 
               if ('weightKg' in updates && updates.weightKg !== undefined) {
                 const calculatedLength = calculateRollLengthMeters(
@@ -502,23 +517,6 @@ export const ReportView = () => {
       quantitySummary: {
         ...draft.quantitySummary,
         [field]: value ? Number(value) : undefined,
-      },
-    } : draft);
-  };
-
-  const updateDraftDetailedResult = (
-    checkpoint: string,
-    updates: { result?: DetailedResultStatus; remarks?: string }
-  ) => {
-    setEditDraft((draft) => draft ? {
-      ...draft,
-      detailedResults: {
-        ...draft.detailedResults,
-        [checkpoint]: {
-          result: draft.detailedResults?.[checkpoint]?.result || 'N/A',
-          remarks: draft.detailedResults?.[checkpoint]?.remarks || '',
-          ...updates,
-        },
       },
     } : draft);
   };
@@ -1026,53 +1024,6 @@ export const ReportView = () => {
                   </div>
                 </section>
 
-                <section className="space-y-4 rounded-3xl border border-gray-100 bg-white p-4 sm:p-5">
-                  <div>
-                    <h3 className="text-[10px] font-black uppercase tracking-widest text-gray-400">
-                      Detailed Results
-                    </h3>
-                    <p className="mt-1 text-xs font-bold text-gray-400">
-                      These checkpoints appear on Page 2 of the PDF report.
-                    </p>
-                  </div>
-
-                  <div className="space-y-3">
-                    {detailedResultCheckpoints.map((checkpoint) => (
-                      <div
-                        key={checkpoint}
-                        className="grid gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3 sm:grid-cols-[1fr_120px_1.4fr]"
-                      >
-                        <div className="text-xs font-black text-gray-800">
-                          {checkpoint}
-                        </div>
-
-                        <select
-                          value={editDraft.detailedResults?.[checkpoint]?.result || 'N/A'}
-                          onChange={(event) => updateDraftDetailedResult(
-                            checkpoint,
-                            { result: event.target.value as DetailedResultStatus }
-                          )}
-                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500"
-                        >
-                          {detailedResultOptions.map((option) => (
-                            <option key={option} value={option}>{option}</option>
-                          ))}
-                        </select>
-
-                        <input
-                          value={editDraft.detailedResults?.[checkpoint]?.remarks || ''}
-                          onChange={(event) => updateDraftDetailedResult(
-                            checkpoint,
-                            { remarks: event.target.value }
-                          )}
-                          placeholder="Inspector remarks"
-                          className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    ))}
-                  </div>
-                </section>
-
                 {editDraft.rolls.map((roll, rollIndex) => (
                   <section
                     key={roll.id}
@@ -1099,14 +1050,21 @@ export const ReportView = () => {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-[10px] font-bold text-gray-500">Length (m)</span>
+                        <span className="text-[10px] font-bold text-gray-500">
+                          {editDraft.quantitySummary?.uom === 'Kgs' ? 'Weight (kg)' : 'Length (m)'}
+                        </span>
                         <input
                           required
                           type="number"
                           min="0.01"
                           step="0.01"
-                          value={roll.lengthYards}
-                          onChange={(event) => updateDraftRoll(roll.id, { lengthYards: Number(event.target.value) })}
+                          value={editDraft.quantitySummary?.uom === 'Kgs' ? roll.weightKg || '' : roll.lengthYards}
+                          onChange={(event) => updateDraftRoll(
+                            roll.id,
+                            editDraft.quantitySummary?.uom === 'Kgs'
+                              ? { weightKg: event.target.value ? Number(event.target.value) : undefined }
+                              : { lengthYards: Number(event.target.value) }
+                          )}
                           className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
                         />
                       </label>
@@ -1125,16 +1083,28 @@ export const ReportView = () => {
                       </label>
 
                       <label className="space-y-1">
-                        <span className="text-[10px] font-bold text-gray-500">Weight (kg)</span>
+                        <span className="text-[10px] font-bold text-gray-500">
+                          {editDraft.quantitySummary?.uom === 'Kgs' ? 'Length (m)' : 'Weight (kg)'}
+                        </span>
                         <input
+                          required={editDraft.quantitySummary?.uom === 'Meters' || editDraft.quantitySummary?.uom === 'Kgs'}
                           type="number"
                           min="0"
                           step="0.01"
-                          value={roll.weightKg || ''}
-                          onChange={(event) => updateDraftRoll(roll.id, {
-                            weightKg: event.target.value ? Number(event.target.value) : undefined,
-                          })}
-                          className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500"
+                          value={editDraft.quantitySummary?.uom === 'Kgs' ? roll.lengthYards : roll.weightKg || ''}
+                          onChange={(event) => updateDraftRoll(
+                            roll.id,
+                            editDraft.quantitySummary?.uom === 'Kgs'
+                              ? { lengthYards: Number(event.target.value) }
+                              : { weightKg: event.target.value ? Number(event.target.value) : undefined }
+                          )}
+                          readOnly={editDraft.quantitySummary?.uom === 'Meters' || editDraft.quantitySummary?.uom === 'Kgs'}
+                          aria-readonly={editDraft.quantitySummary?.uom === 'Meters' || editDraft.quantitySummary?.uom === 'Kgs'}
+                          className={`w-full rounded-xl border px-3 py-2.5 outline-none focus:ring-2 focus:ring-blue-500 ${
+                            editDraft.quantitySummary?.uom === 'Meters' || editDraft.quantitySummary?.uom === 'Kgs'
+                              ? 'border-blue-100 bg-blue-50 text-blue-900 cursor-not-allowed'
+                              : 'border-gray-200 bg-gray-50'
+                          }`}
                         />
                       </label>
                     </div>

@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useStore } from '../store';
-import { FabricConstruction, Inspection } from '../types';
+import { DetailedResultStatus, FabricConstruction, Inspection } from '../types';
 import { ArrowLeft, ArrowRight, Save, Clipboard } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { cn, generateCertificateRef, getDefaultFabricConstruction } from '../lib/utils';
+import { DETAILED_RESULT_CHECKPOINTS, DETAILED_RESULT_OPTIONS } from '../constants';
 
 const constructionFieldsByType: Record<string, Array<{ name: keyof FabricConstruction; label: string; type?: string }>> = {
   Woven: [
@@ -145,6 +146,23 @@ export const CreateInspection = () => {
     }));
   };
 
+  const handleQualityCheckpointChange = (
+    checkpoint: string,
+    updates: { result?: DetailedResultStatus; remarks?: string }
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      detailedResults: {
+        ...prev.detailedResults,
+        [checkpoint]: {
+          result: prev.detailedResults?.[checkpoint]?.result || 'N/A',
+          remarks: prev.detailedResults?.[checkpoint]?.remarks || '',
+          ...updates,
+        },
+      },
+    }));
+  };
+
   const handleNext = () => setStep((s) => s + 1);
   const handleBack = () => setStep((s) => s - 1);
 
@@ -174,6 +192,7 @@ export const CreateInspection = () => {
     { id: 2, title: 'Fabric Details' },
     { id: 3, title: 'Initial Qty' },
     { id: 4, title: 'Summary' },
+    { id: 5, title: 'Quality Checks' },
   ];
 
   return (
@@ -446,6 +465,59 @@ export const CreateInspection = () => {
               </div>
             </motion.div>
           )}
+
+          {step === 5 && (
+            <motion.div
+              key="step5"
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              className="space-y-4"
+            >
+              <div>
+                <h3 className="font-bold text-lg text-gray-900">Quality Checkpoints</h3>
+                <p className="text-sm text-gray-500">
+                  Record the quality observations known before you begin the roll inspection. They will appear in the final report.
+                </p>
+              </div>
+
+              <div className="space-y-3">
+                {DETAILED_RESULT_CHECKPOINTS.map((checkpoint) => (
+                  <div
+                    key={checkpoint}
+                    className="grid gap-3 rounded-2xl border border-gray-100 bg-gray-50 p-3 sm:grid-cols-[1fr_120px_1.4fr]"
+                  >
+                    <div className="self-center text-xs font-black text-gray-800">
+                      {checkpoint}
+                    </div>
+
+                    <select
+                      value={formData.detailedResults?.[checkpoint]?.result || 'N/A'}
+                      onChange={(event) => handleQualityCheckpointChange(
+                        checkpoint,
+                        { result: event.target.value as DetailedResultStatus }
+                      )}
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs font-bold outline-none focus:ring-2 focus:ring-blue-500"
+                    >
+                      {DETAILED_RESULT_OPTIONS.map((option) => (
+                        <option key={option} value={option}>{option}</option>
+                      ))}
+                    </select>
+
+                    <input
+                      value={formData.detailedResults?.[checkpoint]?.remarks || ''}
+                      onChange={(event) => handleQualityCheckpointChange(
+                        checkpoint,
+                        { remarks: event.target.value }
+                      )}
+                      placeholder="Inspector remarks"
+                      className="w-full rounded-xl border border-gray-200 bg-white px-3 py-2.5 text-xs outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </AnimatePresence>
 
         <div className="mt-8 flex gap-3">
@@ -457,7 +529,7 @@ export const CreateInspection = () => {
               Back
             </button>
           )}
-          {step < 4 ? (
+          {step < 5 ? (
             <button
               onClick={handleNext}
               disabled={step === 1 && !formData.customerName}

@@ -40,15 +40,6 @@ service cloud.firestore {
         && data.role in ['INSPECTOR', 'MANAGER', 'ADMIN'];
     }
 
-    function isValidContactRequest(data) {
-      return data.keys().hasOnly(['name', 'email', 'company', 'message', 'createdAt'])
-        && data.name is string && data.name.size() > 0 && data.name.size() <= 100
-        && data.email is string && data.email.size() > 0 && data.email.size() <= 254
-        && data.company is string && data.company.size() > 0 && data.company.size() <= 160
-        && data.message is string && data.message.size() > 0 && data.message.size() <= 2000
-        && data.createdAt == request.time;
-    }
-
     // Validation Blueprints
     function isValidInspection(data) {
       return data.id is string && data.id.size() <= 128
@@ -96,11 +87,5 @@ service cloud.firestore {
         && (isAdmin() || (isOwner(userId) && incoming().role == existing().role));
     }
 
-    // Public sales inquiries. They can only be created; only admins can review them.
-    match /contactRequests/{requestId} {
-      allow create: if isValidContactRequest(incoming());
-      allow read: if isAdmin();
-      allow update, delete: if false;
-    }
   }
 }

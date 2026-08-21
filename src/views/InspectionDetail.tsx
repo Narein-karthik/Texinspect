@@ -56,6 +56,23 @@ export const InspectionDetail = () => {
       const width = Number(next.widthInches);
       const length = Number(next.lengthYards);
       const weight = Number(next.weightKg);
+      const uom = inspection?.quantitySummary?.uom;
+
+      if (uom === 'Kgs') {
+        if (field === 'weightKg' || (field === 'widthInches' && next.weightKg)) {
+          const calculatedLength = calculateRollLengthMeters(gsm, width, weight);
+          next.lengthYards = calculatedLength ? String(calculatedLength) : '';
+        }
+        return next;
+      }
+
+      if (uom === 'Meters') {
+        if (field === 'lengthYards' || (field === 'widthInches' && next.lengthYards)) {
+          const calculatedWeight = calculateRollWeightKg(gsm, width, length);
+          next.weightKg = calculatedWeight ? String(calculatedWeight) : '';
+        }
+        return next;
+      }
 
       if (field === 'weightKg') {
         const calculatedLength = calculateRollLengthMeters(gsm, width, weight);
@@ -87,6 +104,9 @@ export const InspectionDetail = () => {
   }
 
   const activeRoll = inspection.rolls.find((r) => r.id === activeRollId);
+  const isWeightPrimary = inspection.quantitySummary?.uom === 'Kgs';
+  const usesAutomaticRollMeasure =
+    inspection.quantitySummary?.uom === 'Meters' || isWeightPrimary;
 
   const handleUpdate = (updates: Partial<typeof inspection>) => {
     if (id) updateInspection(id, updates);
@@ -113,13 +133,25 @@ export const InspectionDetail = () => {
     e.preventDefault();
 
     const fd = new FormData(e.currentTarget);
+    const lengthYards = Number(addRollDraft.lengthYards);
+    const widthInches = Number(addRollDraft.widthInches);
+    const weightKg = Number(addRollDraft.weightKg);
+    const uom = inspection.quantitySummary?.uom;
+
+    if (
+      (uom === 'Meters' || uom === 'Kgs') &&
+      (!lengthYards || !widthInches || !weightKg)
+    ) {
+      alert('Enter a valid quantity and width. GSM is also required to calculate the matching value.');
+      return;
+    }
 
     const newRoll: Roll = {
       id: crypto.randomUUID(),
       rollNumber: fd.get('rollNumber') as string,
-      lengthYards: Number(fd.get('lengthYards')),
-      widthInches: Number(fd.get('widthInches')),
-      weightKg: Number(fd.get('weightKg')),
+      lengthYards,
+      widthInches,
+      weightKg,
       shade: fd.get('shade') as string,
       defects: [],
       status: 'PENDING',
@@ -523,18 +555,21 @@ export const InspectionDetail = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">
-                      Length (M)
+                      {isWeightPrimary ? 'Weight (KG)' : 'Length (M)'}
                     </label>
 
                     <input
                       type="number"
-                      name="lengthYards"
+                      name={isWeightPrimary ? 'weightKg' : 'lengthYards'}
                       required
                       min="0"
                       step="0.01"
-                      placeholder="125"
-                      value={addRollDraft.lengthYards}
-                      onChange={(event) => updateAddRollMeasure('lengthYards', event.target.value)}
+                      placeholder={isWeightPrimary ? '22' : '125'}
+                      value={isWeightPrimary ? addRollDraft.weightKg : addRollDraft.lengthYards}
+                      onChange={(event) => updateAddRollMeasure(
+                        isWeightPrimary ? 'weightKg' : 'lengthYards',
+                        event.target.value
+                      )}
                       className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
                     />
                   </div>
@@ -561,18 +596,29 @@ export const InspectionDetail = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
                     <label className="text-xs font-bold text-gray-400 uppercase">
-                      Weight
+                      {isWeightPrimary ? 'Length (M)' : 'Weight (KG)'}
                     </label>
 
                     <input
                       type="number"
-                      name="weightKg"
+                      name={isWeightPrimary ? 'lengthYards' : 'weightKg'}
+                      required={usesAutomaticRollMeasure}
                       min="0"
                       step="0.01"
-                      placeholder="Optional"
-                      value={addRollDraft.weightKg}
-                      onChange={(event) => updateAddRollMeasure('weightKg', event.target.value)}
-                      className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder={usesAutomaticRollMeasure ? 'Calculated automatically' : 'Optional'}
+                      value={isWeightPrimary ? addRollDraft.lengthYards : addRollDraft.weightKg}
+                      onChange={(event) => updateAddRollMeasure(
+                        isWeightPrimary ? 'lengthYards' : 'weightKg',
+                        event.target.value
+                      )}
+                      readOnly={usesAutomaticRollMeasure}
+                      aria-readonly={usesAutomaticRollMeasure}
+                      className={cn(
+                        'w-full px-4 py-3 border rounded-xl outline-none focus:ring-2 focus:ring-blue-500',
+                        usesAutomaticRollMeasure
+                          ? 'bg-blue-50 border-blue-100 text-blue-900 cursor-not-allowed'
+                          : 'bg-gray-50 border-gray-200'
+                      )}
                     />
                   </div>
 
