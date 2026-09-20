@@ -1,14 +1,13 @@
-import React from 'react';
-import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 
-import { Layout } from './components/Layout';
+import { Layout } from './components/layout/Layout';
 
-import { Dashboard } from './views/Dashboard';
-import { CreateInspection } from './views/CreateInspection';
-import { InspectionDetail } from './views/InspectionDetail';
-import { ReportView } from './views/ReportView';
-import ProfileView from './views/ProfileView';
-import { ReportsView } from './views/ReportsView';
+import { CreateInspection } from './pages/CreateInspection';
+import { Dashboard } from './pages/Dashboard';
+import { InspectionDetail } from './pages/InspectionDetail';
+import ProfileView from './pages/ProfileView';
+import { ReportView } from './pages/ReportView';
+import { ReportsView } from './pages/ReportsView';
 
 import { AnimatePresence, motion } from 'motion/react';
 

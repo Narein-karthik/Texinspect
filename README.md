@@ -4,6 +4,9 @@
 
 # Run and deploy your AI Studio app
 
+TexInspect's source organization and verification commands are documented in
+[the architecture guide](docs/architecture.md).
+
 This contains everything you need to run your app locally.
 
 View your app in AI Studio: https://ai.studio/apps/f1bee4b5-0520-4e5d-a438-e431583dbc14
