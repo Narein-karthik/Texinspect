@@ -1,8 +1,8 @@
+import { del, get, set } from 'idb-keyval';
 import { create } from 'zustand';
-import { persist, createJSONStorage } from 'zustand/middleware';
-import { get, set, del } from 'idb-keyval';
+import { createJSONStorage, persist } from 'zustand/middleware';
+import { inspectionService } from './services/firebase/inspectionService';
 import { Inspection, InspectionStore, User } from './types';
-import { inspectionService } from './services/inspectionService';
 
 // Custom storage for idb-keyval to handle persistence in IndexedDB
 const storage = {
@@ -28,10 +28,10 @@ export const useStore = create<InspectionStore>()(
       setInspections: (inspections: Inspection[]) => set({ inspections }),
       setPhotoEvidenceEnabled: (enabled: boolean) => set({ photoEvidenceEnabled: enabled }),
       addInspection: async (inspection) => {
-        set((state) => ({ 
-          inspections: [inspection, ...state.inspections] 
+        set((state) => ({
+          inspections: [inspection, ...state.inspections]
         }));
-        
+
         // Try to sync to Firebase if online
         if (navigator.onLine) {
           try {
